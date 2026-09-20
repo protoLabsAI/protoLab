@@ -1,0 +1,14 @@
+{
+ "suite": "sentiment",
+ "options": [
+  "negative",
+  "positive"
+ ],
+ "question": "What is the sentiment of this review?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 372
+ },
+ "seed": 20260919
+}

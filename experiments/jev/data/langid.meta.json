@@ -1,0 +1,32 @@
+{
+ "suite": "langid",
+ "options": [
+  "Arabic",
+  "Bulgarian",
+  "German",
+  "Greek",
+  "English",
+  "Spanish",
+  "French",
+  "Hindi",
+  "Italian",
+  "Japanese",
+  "Dutch",
+  "Polish",
+  "Portuguese",
+  "Russian",
+  "Swahili",
+  "Thai",
+  "Turkish",
+  "Urdu",
+  "Vietnamese",
+  "Chinese"
+ ],
+ "question": "What language is this text written in?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919
+}

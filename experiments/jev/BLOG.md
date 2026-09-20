@@ -233,6 +233,46 @@ None of this says Jev is bad. It says the open replicas are cloning the cheap ha
 expensive half is whatever RLCD does to make calibration survive a task the model has never
 seen — and that is precisely the cell where my post-hoc temperature fails.
 
+## So which half is hard? (I went and checked)
+
+The obvious follow-up: if post-hoc temperature is the cheap half and RLCD is the expensive one,
+how much is actually *in* the expensive half? That question turns out to be answerable with no
+new inference at all.
+
+Fit isotonic regression **on the test set itself** — an oracle, deliberately, not a method. That
+is the best any monotone recalibration could ever do. The gap between raw and oracle is the
+entire scale budget; whatever is left is ranking, and ranking is a training lever.
+
+```
+arms                              Brier   oracle floor   scale budget
+27B + 4B (the deployable ones)    0.086          0.072   0.013 (16%)
+0.8B / 2B-letter / embed-head     0.265          0.119   0.146 (55%)
+```
+
+**A perfect calibrator buys the 27B 0.010 Brier.** Five-sixths of its error is in the floor. And
+the arms with a big scale budget are precisely the broken ones — the 0.8B below the capability
+floor, the flattened 2B-letter, the under-confident embedder. A large calibration budget is a
+symptom, not an opportunity.
+
+I also tried the cheap shortcut properly: `log T = w · [entropy, margin, label_mass, log k, log
+len]` — decode-time features only — fitted on three suites and applied to a fourth it had never
+seen. A per-item temperature *can* reorder items, so unlike a global scalar it gets a shot at
+both halves. Over 32 cells it was 10 better / 7 worse on ECE versus a global temperature, and
+**net negative on AURC** (6 better / 9 worse). The split is systematic: it rescues broken arms
+(2B-letter langid −0.453 ECE) and damages good ones (27B langid +0.104). Those features detect an
+arm that has stopped working. They carry nothing about the fine structure that separates a good
+arm from a calibrated one.
+
+So the cheap path is closed, and the answer is the inconvenient one: **for a working decision arm
+the hard half is ranking, and ranking only moves with training.** Which is exactly what the
+binary identity in Finding 4 predicted, now with a number on it.
+
+One consolation prize, and it is a good one: on arms where *both* readout formats are individually
+competent, averaging the two distributions is the cheapest deferral improvement I found. The 27B's
+AURC on routing — its worst suite — goes 0.1075 → 0.0830, −23%, for one extra forward pass and no
+training. On the 4B it is worse everywhere, because its `letter` view is the broken one from
+Finding 1. **Averaging with a broken view poisons the signal.**
+
 ## What I did not measure
 
 - **Jev.** Zero cloud calls. The reference arm is written (`jev_arm.py`, one `choice` question
@@ -249,6 +289,11 @@ seen — and that is precisely the cell where my post-hoc temperature fails.
 
 ---
 
-**The one-line version:** constrained decoding is free, calibration is cheap and does not
-transfer, and the deferral budget is the whole product. Measure AURC beside ECE or you will ship
-a model that is perfectly calibrated and anti-correlated with being right.
+**The one-line version:** constrained decoding is free, calibration is cheap, does not transfer,
+and is worth ~0.01 Brier on an arm you would actually deploy — the deferral budget is the whole
+product. Measure AURC beside ECE or you will ship a model that is perfectly calibrated and
+anti-correlated with being right.
+
+The probability vectors behind every number here — seven arms, four suites, 2,000 items, frontier
+model included — are packaged so you can test a calibration method against them without running
+anything: `protoLabsAI/deferral-bench-v0`.

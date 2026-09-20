@@ -1,0 +1,119 @@
+== 1. THE SCALE BUDGET: what ANY post-hoc recalibration could win ==
+Top-label Brier. 'oracle' = isotonic fitted ON THE TEST SET — not a method, a ceiling.
+budget = raw - oracle is the entire scale term; 'floor' (= oracle) is ranking-bound and
+only training moves it. 'T-in cap' = share of the budget an in-domain temperature takes.
+
+arm                  suite       brier oracle budget   T-in  cap% |    REL    RES   AURC
+----------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection   0.544  0.101  0.443  0.249   67% |  0.331  0.020  0.288
+Qwen3.5-0.8B-name    sentiment   0.201  0.151  0.050  0.165   72% |  0.032  0.027  0.115
+Qwen3.5-0.8B-name    routing     0.190  0.172  0.018  0.188   14% |  0.017  0.062  0.197
+Qwen3.5-0.8B-name    langid      0.261  0.199  0.063  0.212   78% |  0.065  0.022  0.585
+
+Qwen3.5-2B-letter    injection   0.108  0.088  0.019  0.108   -0% |  0.010  0.050  0.045
+Qwen3.5-2B-letter    sentiment   0.109  0.091  0.017  0.099   56% |  0.012  0.017  0.057
+Qwen3.5-2B-letter    routing     0.256  0.214  0.042  0.224   76% |  0.044  0.020  0.552
+Qwen3.5-2B-letter    langid      0.584  0.090  0.494  0.090  100% |  0.497  0.004  0.921
+
+Qwen3.5-2B-name      injection   0.185  0.124  0.061  0.145   65% |  0.049  0.039  0.076
+Qwen3.5-2B-name      sentiment   0.131  0.112  0.020  0.124   38% |  0.016  0.035  0.066
+Qwen3.5-2B-name      routing     0.192  0.176  0.016  0.198  -32% |  0.012  0.050  0.179
+Qwen3.5-2B-name      langid      0.165  0.143  0.022  0.165    0% |  0.016  0.101  0.226
+
+Qwen3.5-4B-letter    injection   0.219  0.119  0.100  0.157   62% |  0.054  0.033  0.093
+Qwen3.5-4B-letter    sentiment   0.062  0.051  0.012  0.056   55% |  0.009  0.005  0.019
+Qwen3.5-4B-letter    routing     0.198  0.176  0.022  0.202  -19% |  0.022  0.045  0.227
+Qwen3.5-4B-letter    langid      0.214  0.184  0.030  0.196   62% |  0.024  0.055  0.237
+
+Qwen3.5-4B-name      injection   0.139  0.109  0.030  0.117   71% |  0.024  0.022  0.063
+Qwen3.5-4B-name      sentiment   0.047  0.041  0.006  0.047    3% |  0.004  0.006  0.010
+Qwen3.5-4B-name      routing     0.181  0.157  0.024  0.177   16% |  0.021  0.036  0.162
+Qwen3.5-4B-name      langid      0.041  0.035  0.006  0.041   -7% |  0.006  0.009  0.011
+
+embed-head           injection   0.099  0.081  0.018  0.085   73% |  0.015  0.014  0.036
+embed-head           sentiment   0.112  0.092  0.020  0.099   64% |  0.017  0.028  0.040
+embed-head           routing     0.184  0.022  0.162  0.025   98% |  0.156  0.010  0.002
+embed-head           langid      0.529  0.128  0.400  0.118  103% |  0.371  0.040  0.087
+
+smart-letter         injection   0.063  0.055  0.008  0.062    6% |  0.006  0.025  0.017
+smart-letter         sentiment   0.043  0.038  0.004  0.043    0% |  0.003  0.013  0.019
+smart-letter         routing     0.155  0.135  0.020  0.166  -53% |  0.021  0.022  0.084
+smart-letter         langid      0.081  0.067  0.014  0.079   17% |  0.011  0.039  0.020
+
+smart-name           injection   0.075  0.063  0.012  0.075    2% |  0.012  0.032  0.020
+smart-name           sentiment   0.037  0.032  0.005  0.037    2% |  0.006  0.010  0.016
+smart-name           routing     0.159  0.137  0.021  0.156   15% |  0.015  0.014  0.107
+smart-name           langid      0.007  0.005  0.003  0.008  -22% |  0.007  0.007  0.000
+
+pooled: mean Brier 0.174, mean oracle floor 0.106, mean scale budget 0.068 (39% of Brier)
+
+== 3. CONDITIONAL TEMPERATURE, LEAVE-ONE-SUITE-OUT ==
+log T = w . [entropy, margin, label_mass, log k, log len], fitted on the OTHER three
+suites' calib splits, applied to a suite it has never seen. Compared against the same
+fold's global scalar T-loso. A per-item T can reorder, so AURC is in play too.
+
+arm                  suite      | ECE raw   glob   cond      d cond vs glob [95% CI] | AURC raw   cond              dAURC
+-------------------------------------------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection  |   0.568  0.492  0.336 -0.154 [-0.179,-0.122] better |   0.2881 0.2949 +0.007 [+0.001,+0.014] WORSE 
+Qwen3.5-0.8B-name    sentiment  |   0.164  0.078  0.112 +0.030 [-0.010,+0.066] n.s.   |   0.1151 0.1192 +0.004 [-0.002,+0.010] n.s.  
+Qwen3.5-0.8B-name    routing    |   0.108  0.374  0.275 -0.099 [-0.110,-0.086] better |   0.1970 0.2092 +0.012 [+0.001,+0.025] WORSE 
+Qwen3.5-0.8B-name    langid     |   0.222  0.138  0.186 +0.050 [-0.042,+0.140] n.s.   |   0.5851 0.5418 -0.043 [-0.076,-0.009] better
+
+Qwen3.5-2B-letter    injection  |   0.092  0.243  0.098 -0.144 [-0.212,-0.074] better |   0.0450 0.1505 +0.106 [+0.051,+0.165] WORSE 
+Qwen3.5-2B-letter    sentiment  |   0.091  0.268  0.077 -0.182 [-0.198,-0.155] better |   0.0570 0.0604 +0.003 [-0.017,+0.025] n.s.  
+Qwen3.5-2B-letter    routing    |   0.159  0.194  0.215 +0.018 [+0.004,+0.023] WORSE  |   0.5516 0.5100 -0.041 [-0.065,-0.017] better
+Qwen3.5-2B-letter    langid     |   0.680  0.556  0.099 -0.453 [-0.482,-0.418] better |   0.9208 0.9158 -0.005 [-0.053,+0.042] n.s.  
+
+Qwen3.5-2B-name      injection  |   0.175  0.169  0.091 -0.067 [-0.098,-0.029] better |   0.0759 0.0674 -0.009 [-0.017,-0.001] better
+Qwen3.5-2B-name      sentiment  |   0.099  0.085  0.048 -0.024 [-0.062,+0.019] n.s.   |   0.0658 0.0630 -0.003 [-0.009,+0.002] n.s.  
+Qwen3.5-2B-name      routing    |   0.079  0.091  0.086 -0.004 [-0.059,+0.050] n.s.   |   0.1788 0.1734 -0.005 [-0.011,+0.000] n.s.  
+Qwen3.5-2B-name      langid     |   0.121  0.141  0.088 -0.040 [-0.081,+0.007] n.s.   |   0.2260 0.2647 +0.039 [+0.016,+0.067] WORSE 
+
+Qwen3.5-4B-letter    injection  |   0.209  0.181  0.241 +0.059 [+0.044,+0.072] WORSE  |   0.0928 0.1430 +0.050 [+0.019,+0.085] WORSE 
+Qwen3.5-4B-letter    sentiment  |   0.064  0.152  0.233 +0.081 [+0.076,+0.087] WORSE  |   0.0187 0.0182 -0.000 [-0.003,+0.002] n.s.  
+Qwen3.5-4B-letter    routing    |   0.134  0.178  0.155 -0.023 [-0.044,-0.003] better |   0.2272 0.2319 +0.005 [-0.006,+0.014] n.s.  
+Qwen3.5-4B-letter    langid     |   0.142  0.126  0.094 -0.018 [-0.068,+0.032] n.s.   |   0.2373 0.2164 -0.021 [-0.059,+0.012] n.s.  
+
+Qwen3.5-4B-name      injection  |   0.126  0.095  0.083 -0.011 [-0.026,+0.005] n.s.   |   0.0634 0.0924 +0.028 [+0.000,+0.064] WORSE 
+Qwen3.5-4B-name      sentiment  |   0.037  0.027  0.114 +0.076 [+0.051,+0.090] WORSE  |   0.0096 0.0094 -0.000 [-0.000,+0.000] n.s.  
+Qwen3.5-4B-name      routing    |   0.136  0.095  0.102 +0.005 [-0.034,+0.041] n.s.   |   0.1623 0.1579 -0.004 [-0.009,-0.000] better
+Qwen3.5-4B-name      langid     |   0.037  0.206  0.279 +0.073 [+0.061,+0.084] WORSE  |   0.0107 0.0218 +0.011 [+0.000,+0.027] WORSE 
+
+embed-head           injection  |   0.116  0.078  0.016 -0.044 [-0.075,-0.006] better |   0.0357 0.0325 -0.003 [-0.009,+0.000] n.s.  
+embed-head           sentiment  |   0.117  0.094  0.045 -0.039 [-0.076,+0.006] n.s.   |   0.0397 0.0414 +0.002 [-0.001,+0.006] n.s.  
+embed-head           routing    |   0.368  0.019  0.024 +0.002 [-0.009,+0.012] n.s.   |   0.0024 0.0016 -0.001 [-0.002,+0.000] n.s.  
+embed-head           langid     |   0.589  0.364  0.080 -0.266 [-0.301,-0.221] better |   0.0872 0.0755 -0.012 [-0.021,-0.004] better
+
+smart-letter         injection  |   0.045  0.084  0.058 -0.025 [-0.052,+0.002] n.s.   |   0.0168 0.0211 +0.004 [+0.000,+0.010] WORSE 
+smart-letter         sentiment  |   0.032  0.033  0.029 -0.007 [-0.024,+0.011] n.s.   |   0.0195 0.0199 +0.000 [-0.000,+0.001] n.s.  
+smart-letter         routing    |   0.116  0.112  0.102 -0.009 [-0.037,+0.021] n.s.   |   0.0842 0.0818 -0.002 [-0.005,-0.000] better
+smart-letter         langid     |   0.050  0.064  0.214 +0.146 [+0.101,+0.187] WORSE  |   0.0196 0.0282 +0.008 [+0.003,+0.015] WORSE 
+
+smart-name           injection  |   0.087  0.150  0.079 -0.068 [-0.090,-0.042] better |   0.0202 0.0226 +0.002 [-0.005,+0.011] n.s.  
+smart-name           sentiment  |   0.033  0.030  0.035 -0.003 [-0.025,+0.018] n.s.   |   0.0164 0.0182 +0.002 [-0.003,+0.009] n.s.  
+smart-name           routing    |   0.114  0.114  0.122 -0.001 [-0.024,+0.020] n.s.   |   0.1075 0.1123 +0.005 [-0.007,+0.018] n.s.  
+smart-name           langid     |   0.015  0.032  0.136 +0.104 [+0.092,+0.115] WORSE  |   0.0001 0.0001 +0.000 [-0.000,+0.000] n.s.  
+
+cells=32  ECE cond-vs-global: better 10, WORSE 7  |  AURC cond-vs-raw: better 6, WORSE 9  (rest n.s.)
+
+== 4. FORMAT AGREEMENT AS A CONFIDENCE SIGNAL (two passes we already paid for) ==
+For arms run in both readouts: does combining them rank better than the name format
+alone? 'mean' averages the two distributions; 'gated' zeroes confidence on disagreement.
+
+arm            suite      AURC name    mean   gated  agree% acc|agree
+---------------------------------------------------------------------
+Qwen3.5-2B     injection     0.0759  0.0574  0.0741     94%     0.812
+Qwen3.5-2B     sentiment     0.0658  0.0655  0.0631     92%     0.873
+Qwen3.5-2B     routing       0.1788  0.3316  0.2616     60%     0.564
+Qwen3.5-2B     langid        0.2260  0.6911  0.4545     35%     0.279
+
+Qwen3.5-4B     injection     0.0634  0.0791  0.0692     88%     0.815
+Qwen3.5-4B     sentiment     0.0096  0.0154  0.0097     98%     0.949
+Qwen3.5-4B     routing       0.1623  0.1952  0.1527     76%     0.802
+Qwen3.5-4B     langid        0.0107  0.0454  0.0210     60%     0.950
+
+smart          injection     0.0202  0.0119  0.0157     86%     0.969
+smart          sentiment     0.0164  0.0186  0.0166     98%     0.959
+smart          routing       0.1075  0.0830  0.1052     89%     0.850
+smart          langid        0.0001  0.0031  0.0009     88%     0.992
+

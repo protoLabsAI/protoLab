@@ -28,5 +28,6 @@
   "calib": 200,
   "train": 1000
  },
- "seed": 20260919
+ "seed": 20260919,
+ "family": "language"
 }

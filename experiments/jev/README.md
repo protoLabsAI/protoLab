@@ -87,6 +87,39 @@ OpenJev's inference path is exactly the `tiny-grammar` arm below and its calibra
 exactly our `T-in`, so our numbers are the measurement neither repo ships. The lesson in
 Finding 7 (temperature cannot reorder a binary decision) applies to every one of them.
 
+## What people are actually using it for (surveyed 2026-09-20)
+
+Five days of ecosystem, catalogued from primary sources — TypeSafe's own published workflows,
+OpenRouter's cookbook, and the two community use-case repos
+([kenhuangus/jev-usecases](https://github.com/kenhuangus/jev-usecases), 27+ harnesses;
+[Anil-matcha/awesome-jev-by-typesafe](https://github.com/Anil-matcha/awesome-jev-by-typesafe),
+31 catalogued cases). Three shapes recur:
+
+1. **Gate between tiers.** The flagship. OpenRouter's "draft-verify-escalate" cookbook has a
+   cheap model draft an answer, Jev judge whether the draft is *supported by the retrieved
+   context* (`supported` / `unsupported` / `declined` with confidence), and a frontier model take
+   over only on failure.
+2. **Pre-filter for expensive context.** A `noul` per retrieved passage before anything expensive
+   sees it — the filter costs less than the context window it saves.
+3. **Typed routing with action bands.** `auto` / `confirm` / `human` / `block`, thresholds set
+   **per action by risk**, low confidence treated as a first-class branch rather than a
+   classification. Vendor workflows: security incident response, invoice processing, customer
+   service, agent-trace review.
+
+**Nobody publishes measured quality.** Both catalogues say so themselves — kenhuangus: "fixture
+success on `jev-1.13.0` shows the calls return typed decisions. It does not show that the
+procedures are safe to run without review"; Anil-matcha: treat vendor latency claims as
+"vendor-reported, workload-dependent" and benchmark your own. The one headline number in
+circulation is OpenRouter's cascade result — **"0 wrong answers at about 7% of the cost"**,
+$0.175 → $0.012 — and it is **2 errors vs 0 on 50 questions**: Fisher exact two-tailed
+**p = 0.495**. Resolving a 4-point error-rate difference needs ~10,000 items per arm, not 50.
+The cost ratio is probably real; the quality claim is not measured.
+
+**This changed our design, and we tested the change** — see Finding 12. Every deployed pattern
+above uses the decision model as a **verifier of someone else's output**, not as a decider
+deferring on its own confidence. Those are different signals: a decider's confidence is
+correlated with its own errors by construction, an independent verifier's is not.
+
 ## The actual question
 
 Jev's contribution is not "constrained output" — we already have that (xgrammar on the vLLM

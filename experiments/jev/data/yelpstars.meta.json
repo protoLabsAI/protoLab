@@ -1,0 +1,22 @@
+{
+ "suite": "yelpstars",
+ "family": "ordinal",
+ "options": [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5"
+ ],
+ "question": "How many stars out of 5 does this review give?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.23333333333333334
+}

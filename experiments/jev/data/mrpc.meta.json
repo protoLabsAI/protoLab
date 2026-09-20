@@ -1,0 +1,19 @@
+{
+ "suite": "mrpc",
+ "family": "nli",
+ "options": [
+  "different",
+  "equivalent"
+ ],
+ "question": "Do these two sentences mean the same thing?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.6966666666666667
+}

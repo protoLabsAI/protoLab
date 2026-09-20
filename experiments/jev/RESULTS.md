@@ -299,6 +299,40 @@ to win and only noise to add.
 Rule: ensemble two views only where both are individually competent, and expect the gain where
 AURC is worst.
 
+## Finding 12 — an independent verifier can beat a decider's own confidence, cheaply
+
+Prompted by the usage survey (README): the field does not deploy these models the way this
+experiment measured them. The deployed shape is a **verifier** judging another model's answer.
+That is testable with data in hand — for each item the decider picks option *j*, and the
+verifier's probability on **that** option is exactly "an independent model's opinion of this
+answer". `verifier.py` ranks the same 4B answers by three gates.
+
+```
+suite      verifier            4B acc   self   verifier      d [95% CI]
+routing    embed-head 0.6B      0.730  0.1623   0.0420  -0.120 [-0.167,-0.080]  better
+injection  embed-head 0.6B      0.833  0.0634   0.0302  -0.033 [-0.060,-0.012]  better
+injection  smart 27B            0.833  0.0634   0.0272  -0.037 [-0.056,-0.019]  better
+langid     smart 27B            0.953  0.0107   0.0012  -0.009 [-0.018,-0.003]  better
+sentiment  Qwen3.5-0.8B         0.947  0.0096   0.0397  +0.030 [+0.011,+0.055]  WORSE
+langid     Qwen3.5-2B           0.953  0.0107   0.0260  +0.016 [+0.003,+0.032]  WORSE
+```
+
+**A 0.6B embedder judging the 4B's answer ranks that answer's correctness ~4× better than the 4B
+itself does** on routing (AURC 0.162 → 0.042). Across 16 cells: 5 better, 4 worse, 7 n.s.
+
+The split is not random, and it is the operating rule: **a verifier helps exactly when it knows
+something the decider does not.** The embed-head was trained on routing's label conventions,
+which is precisely what Finding 4 showed cannot be guessed zero-shot — so it catches the 4B's
+convention errors. On langid and sentiment, where the 4B is already at 0.95, a *weaker* verifier
+(2B, 0.8B) only adds noise and significantly hurts.
+
+**Two honest caveats.** The embed-head **saw labels** (162–1000 per suite); this is a supervised
+verifier, not a free one — though that is also the realistic case, since you usually do have
+labels for your own routing taxonomy. And the 27B-as-verifier rows are economically pointless:
+verifying costs the same forward pass as deciding, so if you can afford the 27B as a verifier you
+can afford it as the decider. **The interesting cell is the cheap supervised verifier**, and it
+is the one that wins biggest.
+
 ## What rung 0 decides
 
 - **Rung 1 and 2 are the only path to the hard half.** No post-hoc method — global, conditional,

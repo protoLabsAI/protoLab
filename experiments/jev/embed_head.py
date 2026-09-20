@@ -31,6 +31,10 @@ def train_softmax(X, y, k, l2=1e-3, iters=600, lr=0.5):
     return W, b
 
 def main():
+    import sys
+    global SUITES
+    if len(sys.argv) > 1:
+        SUITES = sys.argv[1].split(",")
     tag = "embed-head"; out = f"{HERE}/results/{tag}"; os.makedirs(out, exist_ok=True)
     for s in SUITES:
         meta = json.load(open(f"{HERE}/data/{s}.meta.json")); k = len(meta["options"])

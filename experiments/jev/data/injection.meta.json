@@ -10,5 +10,6 @@
   "calib": 200,
   "train": 162
  },
- "seed": 20260919
+ "seed": 20260919,
+ "family": "safety"
 }

@@ -1,0 +1,31 @@
+{
+ "suite": "dbpedia",
+ "family": "topic",
+ "options": [
+  "company",
+  "school",
+  "artist",
+  "athlete",
+  "politician",
+  "transport",
+  "building",
+  "river",
+  "village",
+  "animal",
+  "plant",
+  "album",
+  "film",
+  "book"
+ ],
+ "question": "What kind of thing does this encyclopedia entry describe?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.09666666666666666
+}

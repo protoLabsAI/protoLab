@@ -16,8 +16,16 @@ import numpy as np
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SUITES = ["injection", "sentiment", "routing", "langid"]
 SPLITS = ["test", "calib"]
+
+
+def suites():
+    import glob as _g
+    return sorted(json.load(open(f))["suite"] for f in _g.glob(f"{HERE}/data/*.meta.json"))
+
+
+def family(s):
+    return json.load(open(f"{HERE}/data/{s}.meta.json")).get("family", "unknown")
 
 SOURCE = {
     "injection": {"hf_dataset": "deepset/prompt-injections",
@@ -66,7 +74,8 @@ ARMS = {
 }
 
 REFERENCE = ["deferral.txt", "deferral.json", "transfer.txt", "transfer.json",
-             "bootstrap.txt", "summary.json"]
+             "bootstrap.txt", "summary.json", "v1-analysis.txt", "v1-analysis.json",
+             "verifier.json"]
 
 
 def sha(t):
@@ -75,7 +84,7 @@ def sha(t):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=f"{HERE}/hf/deferral-bench-v0")
+    ap.add_argument("--out", default=f"{HERE}/hf/deferral-bench-v1")
     a = ap.parse_args()
     out = a.out
     for sub in ["manifest", "meta", "probs", "reference", "baselines"]:
@@ -83,6 +92,7 @@ def main():
 
     # ---- manifests + meta ----
     counts = {}
+    SUITES = suites()
     for s in SUITES:
         meta = json.load(open(f"{HERE}/data/{s}.meta.json"))
         for sp in SPLITS:
@@ -94,9 +104,9 @@ def main():
             } for i, r in enumerate(rows)])
             df.to_parquet(f"{out}/manifest/{s}.{sp}.parquet", index=False)
             counts[f"{s}.{sp}"] = len(df)
-        json.dump({**meta, "source": SOURCE[s],
-                   "k": len(meta["options"]),
-                   "majority_baseline_note": "test-split majority class share is in the card"},
+        json.dump({**meta, "family": family(s),
+                   "source": SOURCE.get(s, meta.get("source", {"note": "see rebuild.py"})),
+                   "k": len(meta["options"])},
                   open(f"{out}/meta/{s}.json", "w"), indent=1)
 
     # ---- probability vectors ----
@@ -133,7 +143,8 @@ def main():
     for f in ["scorer.py", "rebuild.py", "README.md"]:
         shutil.copy(f"{HERE}/hf_assets/{f}", f"{out}/{f}")
 
-    json.dump({"arms": ARMS, "suites": SOURCE, "splits": counts,
+    json.dump({"arms": ARMS, "families": {s: family(s) for s in SUITES},
+               "suites": SOURCE, "splits": counts,
                "built_from": "protoLabsAI/lab experiments/jev",
                "note": "test = scored. calib = fits post-hoc calibration only, never scored. "
                        "train exists upstream for the embed-head arm and is not shipped."},
@@ -141,8 +152,10 @@ def main():
 
     total = sum(os.path.getsize(os.path.join(r, f))
                 for r, _, fs in os.walk(out) for f in fs)
+    fams = sorted(set(family(s) for s in SUITES))
     print(f"built {out}")
-    print(f"  {len(ARMS)} arms · {len(SUITES)} suites · {n_vec:,} probability vectors")
+    print(f"  {len(ARMS)} arms · {len(SUITES)} tasks · {len(fams)} families "
+          f"({', '.join(fams)}) · {n_vec:,} probability vectors")
     print(f"  {total/1e6:.1f} MB on disk")
     print("\nNOT pushed. Review the card, then publish deliberately.")
 

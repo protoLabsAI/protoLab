@@ -160,7 +160,7 @@ improved their binary routing, the mechanism has to be something other than temp
 Where temperature *can* reorder (`k > 2`, 16 cells), it is 5 better / 5 worse / 6 not
 significant. A coin flip.
 
-## The headline: a 4B plus a 20% deferral budget is indistinguishable from the 27B
+## The headline I had after four tasks — and what happened when I widened it
 
 Every arm answered the same id-aligned test items, so the cascade can be simulated exactly rather
 than estimated. The small model answers what it is confident about; the rest go to the 27B lane.
@@ -177,12 +177,40 @@ Qwen3.5-4B            30%        0.917   +0.004 [−0.007,+0.015]  n.s.
 embed-head 0.6B       50%        0.938   +0.026 [+0.014,+0.038]  beats 27B
 ```
 
-**Eighty percent of these decisions do not need a 27B.** A 4B doing one forward pass on CPU,
-deferring its least-confident fifth, lands within noise of the frontier lane on the same items.
-I am claiming "indistinguishable", not "beats" — the interval at 30% includes zero in both
-directions and +0.004 is not a win.
+On those four tasks, a 4B deferring its least-confident fifth lands within noise of the frontier
+lane. Eighty percent of the decisions, apparently, not needing a 27B.
 
-The budget is strongly per-task. Smallest deferral rate that reaches 27B-alone accuracy:
+**Then I widened the benchmark to 22 tasks across six families, and the result evaporated.**
+
+```
+                          4 tasks                       22 tasks
+4B alone            0.866  -0.046 [-0.065,-0.027]   0.722  -0.059 [-0.069,-0.050]
+4B + defer 20%      0.904  -0.007 [-0.021,+0.006]   0.758  -0.024 [-0.032,-0.016]
+4B + defer 30%      0.917  +0.004 [-0.007,+0.015]   0.768  -0.014 [-0.020,-0.007]
+4B + defer 50%      0.915  +0.003 [-0.003,+0.009]   0.778  -0.004 [-0.008,-0.000]
+```
+
+At 22 tasks **every** deferral rate is significantly worse than the 27B alone — including
+deferring half the traffic. The parity claim was true of those four tasks and does not
+generalise.
+
+It was not a statistical fluke. The per-item bootstrap was honest and tight. It was a **task
+sample** fluke: my four tasks happened to include language ID, where a 4B scores 0.953 against
+the 27B's 0.993, and binary sentiment at 0.947 vs 0.957. The nineteen I added are less kind —
+ordinal 0.519 vs 0.602, NLI 0.799 vs 0.861, safety 0.736 vs 0.778.
+
+I keep a standing rule in this lab that an underpowered experiment is not a null result. This is
+that rule biting from the other side: four tasks did not fail to detect an effect, they
+*manufactured* one. Task-level *n* governs a task-level claim no matter how tight the per-item
+intervals look.
+
+**What actually survives, at its real size:** deferring the 4B's least-confident 20% closes
+**60% of the gap** to the 27B while paying for 20% of the 27B calls; 50% deferral closes 93%.
+That is a genuine cost lever. It is not parity, and I should not have implied it was on four
+tasks.
+
+The budget is strongly per-task — on the original four, the smallest deferral rate reaching
+27B-alone accuracy was:
 
 ```
 arm              injection  sentiment  routing  langid
@@ -273,6 +301,44 @@ AURC on routing — its worst suite — goes 0.1075 → 0.0830, −23%, for one 
 training. On the 4B it is worse everywhere, because its `letter` view is the broken one from
 Finding 1. **Averaging with a broken view poisons the signal.**
 
+## Three more things the wider set changed
+
+**Calibration transfer is not a coin flip — that was a data-volume artifact.** On four tasks, a
+temperature fitted on three and applied to the fourth was 6 better / 5 worse / 9 n.s., and I
+called it a coin flip. Fitted on 21 tasks across five families and applied to a held-out sixth:
+**26 better / 14 worse / 8 n.s.** Twice as often better as worse. It is a weak effect that three
+tasks cannot estimate, not an absent one. It still doesn't rescue post-hoc calibration — the
+oracle ceiling caps it at ~11–27% of Brier on a working arm, and on binary decisions it still
+can't touch ranking at all — but "weak but real" is the honest phrasing, and I had the wrong one.
+
+**The `score` primitive is the hardest thing here, and nobody has measured it.** The family v0
+never tested is the one every arm is worst at. Star ratings put the *27B* at 0.602 accuracy with
+AURC 0.270 — its confidence barely ranks its own errors — and ordinal carries the largest
+absolute scale budget of any family, twice the next. That makes sense: adjacent-class errors are
+graded, and probability spread across neighbouring stars is informative rather than
+miscalibrated. If a Jev comparison is ever run, ordinal is the sharpest cell, and it is the
+primitive with zero public numbers.
+
+**A verifier helps exactly when it is more accurate than the decider.** Finding 12 held across
+22 tasks and turned into a rule with no exceptions in this data:
+
+```
+verifier          family     verifier acc   4B acc    AURC self -> verifier   verdict
+embed-head 0.6B   safety            0.813    0.736       0.1531    0.0967     better
+embed-head 0.6B   topic             0.812    0.748       0.1198    0.0743     better
+embed-head 0.6B   sentiment         0.694    0.676       0.2078    0.1609     better
+embed-head 0.6B   ordinal           0.519    0.519       0.3450    0.3366     n.s.
+embed-head 0.6B   nli               0.599    0.799       0.1005    0.1331     WORSE
+Qwen3.5-2B        all six        worse everywhere                             WORSE x6
+smart 27B         all six        better everywhere                            better x6
+```
+
+Three families where a 0.6B embedder beats the 4B: three wins. The family where it is much worse:
+significantly worse. So the deployed "draft → verify → escalate" pattern works because the
+verifier is *specialised*, not because verification beats self-confidence intrinsically — and
+the pre-flight check is cheap: measure your candidate verifier's accuracy on the family first,
+and never deploy one weaker than the thing it is verifying.
+
 ## What I did not measure
 
 - **Jev.** Zero cloud calls. The reference arm is written (`jev_arm.py`, one `choice` question
@@ -289,9 +355,9 @@ Finding 1. **Averaging with a broken view poisons the signal.**
 
 ---
 
-**The one-line version:** constrained decoding is free, calibration is cheap, does not transfer,
-and is worth ~0.01 Brier on an arm you would actually deploy — the deferral budget is the whole
-product. Measure AURC beside ECE or you will ship a model that is perfectly calibrated and
+**The one-line version:** constrained decoding is free, calibration is weak-but-real and worth
+~0.01 Brier on an arm you would actually deploy, a deferral budget buys most of a frontier model
+at a fifth of the calls but not all of it — and four tasks is not a benchmark. Measure AURC beside ECE or you will ship a model that is perfectly calibrated and
 anti-correlated with being right.
 
 The probability vectors behind every number here — seven arms, four suites, 2,000 items, frontier

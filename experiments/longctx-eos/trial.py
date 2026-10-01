@@ -73,7 +73,7 @@ def build_prompt(tok, seed: int) -> tuple[str, int]:
     return "".join(parts), target
 
 
-def run_one(client, model, effort, seed, prompt, schema=True):
+def run_one(client, model, effort, seed, prompt, schema=True, fp=None, rp=None):
     t0 = time.time()
     row = {"seed": seed}
     try:
@@ -85,6 +85,8 @@ def run_one(client, model, effort, seed, prompt, schema=True):
             **({"response_format": {"type": "json_schema", "json_schema": {
                 "name": "review", "strict": True, "schema": SCHEMA}}} if schema else {}),
             max_tokens=32768,
+            **({"frequency_penalty": fp} if fp is not None else {}),
+            **({"extra_body": {"repetition_penalty": rp}} if rp is not None else {}),
             timeout=3600,
         )
     except Exception as e:  # infra error, not a model outcome
@@ -125,6 +127,8 @@ def main():
     ap.add_argument("--conc", type=int, default=8)
     ap.add_argument("--effort", default="low")
     ap.add_argument("--seed0", type=int, default=0)
+    ap.add_argument("--frequency-penalty", type=float, default=None)
+    ap.add_argument("--repetition-penalty", type=float, default=None, help="vLLM extra")
     ap.add_argument("--no-schema", action="store_true", help="drop response_format (isolates guided decoding)")
     args = ap.parse_args()
 
@@ -142,7 +146,8 @@ def main():
     eos = tot = 0
     with ThreadPoolExecutor(args.conc) as ex, out.open("a") as fh:
         futs = {ex.submit(run_one, client, args.model, args.effort, s,
-                          build_prompt(tok, s)[0], not args.no_schema): s for s in seeds}
+                          build_prompt(tok, s)[0], not args.no_schema,
+                          args.frequency_penalty, args.repetition_penalty): s for s in seeds}
         for f in as_completed(futs):
             row = f.result()
             fh.write(json.dumps(row) + "\n")

@@ -8,7 +8,16 @@ The smart lane sometimes ends a 60–80K-token reply with EOS partway through re
 - `trial.py`: paired trials (fixed seeds, so every arm gets the same prompts). Real vLLM source
   as the code text, 65–80K tokens, a nonce first so every prompt is cold, non-streaming,
   strict `json_schema`, `reasoning_effort=low`. `--no-schema` drops `response_format`.
-- `driver.sh`: runs the arms back to back and restores replica B at the end.
+- `driver.sh`: runs the arms back to back and restores replica B at the end. Unguarded;
+  this is what overloaded replica A on 2026-10-01. Use `window.sh` instead.
+- `window.sh`: guarded off-hours run. It aborts if A's waiting queue stays above 8 for 3 min or
+  the 16:45Z deadline passes, and restores B on any exit. Arms: PR #44993 overlay at K=3, then
+  `frequency_penalty 0.3` and `repetition_penalty 1.05`, 80 trials each. Traffic is quietest
+  at 11Z–17Z (14–50 req/h vs 300–500 overnight).
+- `pr44993-src.diff`: vllm PR #44993, the reasoning-boundary grammar fix in v0.27.0, for 0.25.1.
+  Overlay, so prod's env is untouched:
+  `cp -as $SP/vllm $OV/vllm`, swap the two patched files for real copies, `patch -p1`.
+  Then `OVERLAY=$OV SPEC_K=3 ./lane.sh`.
 
 ## Results (2026-10-01, Swift-Qwen3.8-27B-NVFP4, vLLM 0.25.1, GPU0)
 
@@ -31,6 +40,15 @@ k1            not run (window closed)
 
 `results/k3.discarded-v0.jsonl` comes from a first harness version whose prompt builder stopped
 at the first oversized file (one prompt came out at 21K tokens). Excluded from the table.
+
+## Upstream (researched 2026-10-01)
+
+- Invalid JSON = vllm#34650/#48228. Under spec decode, `should_advance()` misses `</think>`, so
+  the grammar never engages. The fix is PR #44993 (in v0.27.0).
+- Blanks = vllm#55420. The model samples `<|im_end|>` inside `<think>`. It reproduces on
+  llama.cpp, with MTP on or off, and on bf16 weights. The engine fix (PR #55562) was closed
+  unmerged. Measured mitigations are in QwenLM/Qwen3.8#216. The gateway recovery is
+  homelab-iac#290.
 
 ## Ops lesson
 

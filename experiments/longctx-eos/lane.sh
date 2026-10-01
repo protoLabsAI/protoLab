@@ -8,4 +8,6 @@ export GPU=0 PORT=8060 MAXLEN=262144 UTIL=0.86 MAXSEQS=32
 export SERVED_NAMES="smart"
 export SPEC_K=${SPEC_K:?set SPEC_K}
 export VLLM_DISABLED_KERNELS=FlashInferFP8ScaledMMLinearKernel
-exec /home/ava/dev/lab/models/serve-qwen38-27b.sh >> "/mnt/scratch/logs/longctx-eos-k${SPEC_K}.log" 2>&1
+# OVERLAY=<dir> puts a patched copy of the vllm package ahead of site-packages (prod env untouched)
+[ -n "${OVERLAY:-}" ] && export PYTHONPATH="$OVERLAY${PYTHONPATH:+:$PYTHONPATH}"
+exec /home/ava/dev/lab/models/serve-qwen38-27b.sh >> "/mnt/scratch/logs/longctx-eos-k${SPEC_K}${OVERLAY:+-patched}.log" 2>&1

@@ -60,4 +60,4 @@ arm() {  # label extra-args...
 arm p-k3                                  # patched baseline: JSON should be 0 invalid
 arm p-k3-fp03  --frequency-penalty 0.3
 arm p-k3-rp105 --repetition-penalty 1.05
-[ -f $ABORT ] && log "ABORTED: $(cat $ABORT)"
+if [ -f $ABORT ]; then log "ABORTED: $(cat $ABORT)"; exit 1; fi

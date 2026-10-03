@@ -41,6 +41,28 @@ k1            not run (window closed)
 `results/k3.discarded-v0.jsonl` comes from a first harness version whose prompt builder stopped
 at the first oversized file (one prompt came out at 21K tokens). Excluded from the table.
 
+## Window 2026-10-02 11:30–15:34Z (guard never tripped, B restored automatically)
+
+All K=3 with the PR #44993 overlay, seeds 0–79, same shape as above:
+
+```
+arm                n   blank         hit 32k cap   invalid JSON (clean stops)   completion p50
+k3 (no fix)       40   5  (12.5%)    2             25/33                        8922
+p-k3 (fix)        80   7  (8.8%)     4              0/69                        9362
+p-k3-fp03         80  75  (93.8%)    0              0/5                         2198
+p-k3-rp105        80  10  (12.5%)    3              1/67                        8248
+```
+
+- **PR #44993 fixes the invalid JSON:** 25/33 → 0/69. The overlay loaded in the engine env
+  (verified via /proc). This is ready to ship to prod.
+- **`frequency_penalty 0.3` is a disaster on code:** 94% blank (p≈0 vs baseline), with reasoning
+  cut to about a quarter. The penalty builds up on the tokens code repeats constantly until EOS
+  wins. That's the opposite of QwenLM/Qwen3.8#216's prose result. Don't use it on smart.
+- **`repetition_penalty 1.05` doesn't help:** 10/80 vs 7/80, p=0.61.
+- The one invalid JSON under rp105 (seed 1) is a different edge case. The model was reviewing a
+  tool parser and wrote `<think>`-tag text inside its reasoning, which split reasoning from content early.
+- Penalties ruled out, so blanks get recovered at the gateway (homelab-iac#290).
+
 ## Upstream (researched 2026-10-01)
 
 - Invalid JSON = vllm#34650/#48228. Under spec decode, `should_advance()` misses `</think>`, so

@@ -1,0 +1,27 @@
+{
+ "suite": "yahoo",
+ "family": "topic",
+ "options": [
+  "society",
+  "science",
+  "health",
+  "education",
+  "computers",
+  "sports",
+  "business",
+  "entertainment",
+  "family",
+  "politics"
+ ],
+ "question": "Which category does this question belong to?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.12333333333333334
+}

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Qwen3.8-27B bf16 serve — THE script the vllm-local systemd unit runs in prod (since
-# 2026-08-15); this file is its source of truth, committed to stop repo/disk drift.
-# Defaults are the eval configuration: single GPU 0, :8000, served as `local`, MTP off.
+# Qwen3.8-27B bf16 eval serve — single GPU 0, :8000, served as `local`.
 #
 # Qwen3.8 is a NEW POST-TRAIN ON THE QWEN3.5 ARCHITECTURE, not a new arch:
 # config.json declares model_type=qwen3_5 / Qwen3_5ForConditionalGeneration, which both
@@ -14,9 +12,23 @@
 # thinking is plain <think>...</think> -> qwen3_xml + qwen3. The classic `hermes` JSON-in-
 # <tool_call> parser will NOT parse this template.
 #
-# Thinking is ON by default with reasoning_effort=xhigh and preserve_thinking=true. That is a
-# real token-cost lever, not a nuisance knob (see feedback_eval_prod_token_budget) — eval at
-# the budget prod would actually use, and record which effort level produced the numbers.
+# Thinking is ON by default with preserve_thinking=true. That is a real token-cost lever, not a
+# nuisance knob (see feedback_eval_prod_token_budget) — eval at the budget prod would actually
+# use, and record which effort level produced the numbers.
+#
+# EFFORT DEFAULT IS PINNED TO `medium` VIA A CHAT-TEMPLATE OVERRIDE (2026-09-08).
+# The model's shipped chat_template.jinja does `reasoning_effort|default('xhigh')`. A
+# 252-generation judge-free sweep (experiments/effort-sweep/, run-20260908-061817) found xhigh
+# is NOT deeper thinking — it is a TERMINATION failure. Conditioned on finishing it is the best
+# arm on both suites (0.932 / 1.000), but it burns the full 32k budget and scores 0 on 19% of
+# reasoning_hard and 6% of lcb_medium runs; on LiveCodeBench *hard* it failed to return at all
+# on 12 of 18 item-matched runs even at a 3600 s client timeout. `medium` ties or beats every
+# arm at 53–80% fewer reasoning tokens and zero cap-outs.
+#
+# The gateway already pins low/medium on every alias, so this default only ever reached callers
+# hitting :8041/:8042 DIRECTLY (eval scripts, tailnet consumers that skip the proxy) — exactly
+# the traffic that had no protection. See protoLabsAI/homelab-iac#255.
+# Set CHAT_TEMPLATE= (empty) to fall back to the model's shipped template.
 #
 # --enable-prompt-tokens-details is REQUIRED for anyone to SEE prefix caching. Without it
 # usage.prompt_tokens_details comes back null on every response even when the lane is hitting
@@ -76,6 +88,30 @@ export CUDA_VISIBLE_DEVICES=$GPU
 SPEC_ARGS=()
 [ -n "$SPEC" ] && SPEC_ARGS=(--speculative-config "$SPEC")
 
+# Effort-default override (see the header note). Differs from the model's shipped template by
+# exactly one line: reasoning_effort|default('xhigh') -> default('medium').
+CHAT_TEMPLATE=${CHAT_TEMPLATE-"$(cd "$(dirname "$0")" && pwd)/chat-templates/qwen38-effort-medium.jinja"}
+TEMPLATE_ARGS=()
+if [ -n "$CHAT_TEMPLATE" ]; then
+  if [ ! -f "$CHAT_TEMPLATE" ]; then
+    echo "FATAL: CHAT_TEMPLATE not found: $CHAT_TEMPLATE" >&2
+    echo "       Serving without it would silently restore the xhigh default." >&2
+    exit 1
+  fi
+  # Staleness guard. This override is a COPY of one model's chat template, so a model bump can
+  # silently pin an outdated tool-call/thinking format. Compare against the shipped template
+  # ignoring the one line we intend to differ; warn loudly rather than refuse to start.
+  SHIPPED="$MODEL/chat_template.jinja"
+  if [ -f "$SHIPPED" ]; then
+    if ! diff -q <(grep -v "reasoning_effort|default" "$SHIPPED") \
+                 <(grep -v "reasoning_effort|default" "$CHAT_TEMPLATE") >/dev/null; then
+      echo "WARNING: $CHAT_TEMPLATE differs from $SHIPPED by more than the effort default." >&2
+      echo "         Regenerate it from the shipped template before trusting this lane." >&2
+    fi
+  fi
+  TEMPLATE_ARGS=(--chat-template "$CHAT_TEMPLATE")
+fi
+
 # shellcheck disable=SC2086
 exec "$VENV/bin/vllm" serve "$MODEL" \
   "${SPEC_ARGS[@]}" \
@@ -87,6 +123,7 @@ exec "$VENV/bin/vllm" serve "$MODEL" \
   --enable-auto-tool-choice \
   --tool-call-parser "$TOOLP" \
   --reasoning-parser qwen3 \
+  "${TEMPLATE_ARGS[@]}" \
   --generation-config auto \
   --enable-chunked-prefill \
   --enable-prefix-caching \

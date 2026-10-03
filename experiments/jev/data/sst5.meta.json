@@ -1,0 +1,22 @@
+{
+ "suite": "sst5",
+ "family": "ordinal",
+ "options": [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5"
+ ],
+ "question": "On a 1-5 scale from very negative to very positive, how positive is this review?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.2966666666666667
+}

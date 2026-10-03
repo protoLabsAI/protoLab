@@ -1,0 +1,197 @@
+diff --git a/stacks/ai/config/litellm/config.yaml b/stacks/ai/config/litellm/config.yaml
+index f6cd394..4368d70 100644
+--- a/stacks/ai/config/litellm/config.yaml
++++ b/stacks/ai/config/litellm/config.yaml
+@@ -9,7 +9,8 @@ model_list:
+   # below.
+ 
+   # ─── Blackwell single-lane fleet (homelab-iac#234, 2026-08-15) ───────
+-  # ONE LLM lane on protolabs. Cut over 2026-08-15 from DeepSeek-V4-Flash to
++  # TWO REPLICA LLM lanes on protolabs as of 2026-08-23 (was ONE). Cut over
++  # 2026-08-15 from DeepSeek-V4-Flash to
+   # **Qwen3.8-27B-NVFP4 + MTP** — `vllm-smart-qwen38.service` →
+   # ~/dev/lab/models/serve-qwen38-27b.sh, GPU1 ONLY, util 0.62, MTP K=1,
+   # 262144 ctx, parsers qwen3 + qwen3_coder. Same host, same port, same served
+@@ -17,7 +18,13 @@ model_list:
+   # vocabulary did, completely. See the THINKING CONTROL block below.
+   #   :8041  smart / reasoning / coder / qwen3.8-27b-nvfp4 — ONE engine, four
+   #          served names (verified on /v1/models 2026-08-15). The DSV4-era
+-  #          `deepseek-v4-flash` served name is GONE from this lane.
++  #          `deepseek-v4-flash` served name is GONE from this lane. GPU1.
++  #   :8042  REPLICA B of the exact same engine on GPU0
++  #          (`vllm-smart-qwen38-b.service`), added 2026-08-23. Every
++  #          protolabs/* tier that names :8041 now has a twin deployment on
++  #          :8042, so those groups are load-balanced pools under
++  #          routing_strategy: least-busy. The two units differ ONLY in
++  #          GPU/PORT — keep them that way, here and in the systemd units.
+   #   :8001 + :8004  embed-A and embed-B — both running again (embed-B was
+   #          retired 2026-08-11 for the vision lane and came back with it).
+   #   :8093  Fish S2-Pro TTS.  :8188  ComfyUI/LTX.
+@@ -27,9 +34,16 @@ model_list:
+   # `vllm-smart.service` (the DSV4 TP=2 lane) is disabled but kept for
+   # rollback, and declares `Conflicts=` this unit — DSV4 needs BOTH cards, so
+   # this lane and Fish must be down before it can start.
+-  # GPU0 is now essentially IDLE (1.7 G of 98 G, embeds only): there is room
+-  # for a second engine again for the first time since #215 — relevant to the
+-  # parked protopen block below.
++  # GPU0 IS NO LONGER IDLE — replica B took it on 2026-08-23. The room that
++  # this note used to advertise is SPENT: the card now runs :8042 at util 0.86
++  # plus embed-B, leaving ~9 G. Both former GPU0 tenants were stopped AND
++  # disabled to pay for it — `vllm-protopen.service` (:8050) and
++  # `daria-lane.service` (:8045, protolabs/creative). The `disable` is
++  # load-bearing: left enabled they return at boot, race :8042 for GPU0, and
++  # one of them OOMs. Reviving either means dropping :8042's util FIRST.
++  # Why replica B: the single lane was saturated — 16 running (pinned at its
++  # --max-num-seqs cap), 11 queued on reason=capacity, KV 87.5%, 18
++  # preemptions, 982 requests in 13.6h.
+   # Why the swap: quality is inside measurement noise of DSV4 on every axis
+   # except function_call (0.870 vs 0.907), but it runs on ONE card instead of
+   # two — +17% agg tok/s, −15% TPOT, −12% TTFT at context C=8, MTP accept
+@@ -172,6 +186,34 @@ model_list:
+       # protolabs/vision (#222). vision exists to pin thinking off for it.
+       supports_vision: true
+ 
++  # ── replica B — the SAME Qwen3.8-27B engine on :8042 (GPU0) ──────────────
++  # A duplicate model_name is a LiteLLM LOAD-BALANCED POOL, not a fallback
++  # (fallbacks live in router_settings.fallbacks). With
++  # routing_strategy: least-busy the two lanes split this group's traffic.
++  #
++  # Added 2026-08-23: the single :8041 lane was saturated — 16 running (pinned
++  # at its --max-num-seqs cap), 11 queued on reason=capacity, KV 87.5%, 18
++  # preemptions, 982 requests in 13.6h. Paid for by evicting protopen (:8050)
++  # and daria/protolabs-creative (:8045) from GPU0, both stopped AND disabled.
++  #
++  # ⚠️ EVERY param below must stay identical to the :8041 deployment above.
++  # least-busy picks a lane per request, so any drift (effort tier, token
++  # clamps, extra_body) becomes a coin-flip in behaviour that no caller can
++  # see or reproduce. Change the pair together or not at all.
++  - model_name: protolabs/smart
++    litellm_params:
++      model: openai/smart
++      api_base: http://protolabs:8042/v1
++      api_key: os.environ/VLLM_API_KEY
++      allowed_openai_params: ["reasoning_effort"]
++      reasoning_effort: low
++    model_info:
++      mode: chat
++      max_input_tokens: 196608
++      max_output_tokens: 32000
++      supports_function_calling: true
++      supports_vision: true
++
+   # reasoning + coder — the DELIBERATING tiers. Both pinned MEDIUM (#234).
+   #
+   # ⚠️ BOTH OF THEIR OLD PINS ARE ILLEGAL ON THIS LANE. `reasoning` carried
+@@ -244,6 +286,23 @@ model_list:
+       supports_function_calling: true
+       supports_vision: true
+ 
++  # ── replica B on :8042 (GPU0) — load-balanced sibling of the deployment
++  #    above under routing_strategy: least-busy. Keep params identical; see
++  #    the protolabs/smart replica for the full rationale.
++  - model_name: protolabs/reasoning
++    litellm_params:
++      model: openai/reasoning          # served-model-name on the same :8042 engine
++      api_base: http://protolabs:8042/v1
++      api_key: os.environ/VLLM_API_KEY
++      allowed_openai_params: ["reasoning_effort"]
++      reasoning_effort: medium
++    model_info:
++      mode: chat
++      max_input_tokens: 196608
++      max_output_tokens: 32000
++      supports_function_calling: true
++      supports_vision: true
++
+   - model_name: protolabs/coder
+     litellm_params:
+       model: openai/coder              # served-model-name on the same :8041 engine
+@@ -267,6 +326,23 @@ model_list:
+       max_output_tokens: 32000
+       supports_function_calling: true
+       supports_vision: true
++
++  # ── replica B on :8042 (GPU0) — load-balanced sibling of the deployment
++  #    above under routing_strategy: least-busy. Keep params identical; see
++  #    the protolabs/smart replica for the full rationale.
++  - model_name: protolabs/coder
++    litellm_params:
++      model: openai/coder              # served-model-name on the same :8042 engine
++      api_base: http://protolabs:8042/v1
++      api_key: os.environ/VLLM_API_KEY
++      allowed_openai_params: ["reasoning_effort"]
++      reasoning_effort: medium
++    model_info:
++      mode: chat
++      max_input_tokens: 196608
++      max_output_tokens: 32000
++      supports_function_calling: true
++      supports_vision: true
+   # (:8032, the old Qwen3-Coder-Next-80B lane, is DEAD — never re-point here.)
+   # coder and reasoning carry the same body today. DECIDED 2026-08-16 (#237,
+   # Josh's call): KEEP THEM AS TWO DEPLOYMENTS — the effort pin is the knob most
+@@ -355,6 +431,23 @@ model_list:
+       supports_vision: true
+       supports_function_calling: true
+ 
++  # ── replica B on :8042 (GPU0) — load-balanced sibling of the deployment
++  #    above under routing_strategy: least-busy. Keep params identical; see
++  #    the protolabs/smart replica for the full rationale.
++  - model_name: protolabs/vision
++    litellm_params:
++      model: openai/smart
++      api_base: http://protolabs:8042/v1
++      api_key: os.environ/VLLM_API_KEY
++      allowed_openai_params: ["reasoning_effort"]
++      reasoning_effort: low
++    model_info:
++      mode: chat
++      max_input_tokens: 196608
++      max_output_tokens: 32000
++      supports_vision: true
++      supports_function_calling: true
++
+   # ─── protolabs/creative: Daria-24B-NVFP4 — steered creative lane (#244) ──
+   # A SECOND engine on protolabs, :8045, GPU0 (~20.7 GB: 15 GB NVFP4 weights +
+   # 4.6 GiB fp8 KV). NOT the :8041 lane and NOT a tier of it — this is a
+@@ -388,6 +481,16 @@ model_list:
+   # No reasoning_effort / chat_template_kwargs: this is NOT a qwen3 lane and
+   # none of the :8041 thinking vocabulary applies. budget_guard keys on the
+   # thinking tiers, so it leaves this group alone.
++  # ⛔ BACKEND DOWN as of 2026-08-23 — `daria-lane.service` (:8045) was stopped
++  #    AND disabled to free GPU0 for smart replica B (:8042). This deployment
++  #    is left in place, not deleted, because the lane is a one-command revive
++  #    and its config (the 24576+8192 context split below) is hard-won.
++  #    Consequence, and it is deliberate per the ⛔ note above: this group has
++  #    NO FALLBACK, so every protolabs/creative call now FAILS LOUD rather
++  #    than silently degrading to a different voice. That is the designed
++  #    behaviour for a steered lane; it is not a regression to "fix" by adding
++  #    a fallback. To revive: drop :8042's util, then
++  #    `systemctl enable --now daria-lane`.
+   - model_name: protolabs/creative
+     litellm_params:
+       model: openai/daria
+@@ -540,6 +643,23 @@ model_list:
+       max_output_tokens: 32000
+       supports_function_calling: true
+ 
++  # ── replica B on :8042 (GPU0) — load-balanced sibling of the deployment
++  #    above under routing_strategy: least-busy. Keep params identical; see
++  #    the protolabs/smart replica for the full rationale.
++  - model_name: protolabs/fast
++    litellm_params:
++      model: openai/smart
++      api_base: http://protolabs:8042/v1
++      api_key: os.environ/VLLM_API_KEY
++      extra_body:
++        chat_template_kwargs:
++          enable_thinking: false
++    model_info:
++      mode: chat
++      max_input_tokens: 196608
++      max_output_tokens: 32000
++      supports_function_calling: true
++
+   # ─── protolabs/nano: local Ornith-1.0-35B-A3B IQ2_M on ava (:8181) ──
+   # THE single deployment for ava's local Ornith-35B (IQ2_M GGUF, 12 GB,
+   # deepreinforce-ai/Ornith-1.0-35B, served by ornith-35b.service :8181).

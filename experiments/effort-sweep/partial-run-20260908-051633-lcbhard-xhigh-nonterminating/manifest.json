@@ -1,0 +1,31 @@
+{
+  "model": "protolabs/smart",
+  "gateway": "http://100.101.189.45:4000/v1",
+  "sampling": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20,
+    "min_p": 0.0
+  },
+  "max_tokens": 32768,
+  "efforts": [
+    "none",
+    "low",
+    "medium",
+    "xhigh"
+  ],
+  "trials": 3,
+  "suites": [
+    "lcb_hard",
+    "lcb_medium",
+    "reasoning_hard"
+  ],
+  "lcb_limit": 6,
+  "lcb_medium_limit": 12,
+  "client_timeout_s": 3600,
+  "workers": 24,
+  "n_items": 27,
+  "n_generations": 324,
+  "started": "20260908-051637",
+  "note": "latency measured under concurrent load; tokens are the primary brevity metric"
+}

@@ -1,0 +1,19 @@
+{
+ "suite": "offensive",
+ "family": "safety",
+ "options": [
+  "no",
+  "offensive"
+ ],
+ "question": "Is this social media post offensive?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.6133333333333333
+}

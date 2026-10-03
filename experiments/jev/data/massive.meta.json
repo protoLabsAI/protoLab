@@ -1,0 +1,35 @@
+{
+ "suite": "massive",
+ "family": "topic",
+ "options": [
+  "alarm",
+  "audio",
+  "calendar",
+  "cooking",
+  "datetime",
+  "email",
+  "general",
+  "iot",
+  "lists",
+  "music",
+  "news",
+  "play",
+  "qa",
+  "recommendation",
+  "social",
+  "takeaway",
+  "transport",
+  "weather"
+ ],
+ "question": "Which assistant domain does this user utterance belong to?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.15333333333333332
+}

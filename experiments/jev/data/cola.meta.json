@@ -1,0 +1,19 @@
+{
+ "suite": "cola",
+ "family": "nli",
+ "options": [
+  "unacceptable",
+  "acceptable"
+ ],
+ "question": "Is this sentence grammatically acceptable English?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.7566666666666667
+}

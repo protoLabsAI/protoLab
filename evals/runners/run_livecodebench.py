@@ -50,6 +50,8 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+
+from sampling import resolve, to_openai_kwargs
 import time
 import zlib
 from datetime import datetime, timezone
@@ -356,30 +358,50 @@ def grade_problem(problem: dict, model_output: str, max_tests: int,
 # Model call
 # --------------------------------------------------------------------------------------
 
-def call_model(client, model: str, prompt: str, max_tokens: int) -> str:
+def call_model(client, model: str, prompt: str, max_tokens: int,
+               force_no_think: bool = False, force_think: bool = False):
+    """Return (code_text, completion_tokens). PROD-REPRESENTATIVE: thinking is left to the lane's
+    own default (reasoning models think, coders don't) under a realistic `max_tokens` budget that
+    matches deployment (32k). A reasoning model is NOT punished for using tokens — it's scored on
+    the final extracted code. But the budget is a HARD cap: a model that can't emit a solution
+    within it scores 0 (a real deployment failure — it would time users out too, "not endless").
+    Token usage is returned separately as an efficiency signal, never folded into correctness.
+    `force_no_think=True` forces thinking off (base/non-thinking coding path); `force_think=True`
+    forces thinking on (for agentic-thinker coders whose lane defaults thinking off, e.g. Laguna)."""
+    # Sampling is overridable: some reasoning models (e.g. Ornith-1.5) FAIL TO TERMINATE at the
+    # default 0.2 -- they run to the token cap and emit no code. Their cards specify a much higher
+    # temperature (Ornith-1.5: 0.6 general / 1.0 to reproduce benchmarks). Defaults are unchanged,
+    # so every existing board number stays valid; set LCB_TEMPERATURE/LCB_TOP_P/LCB_TOP_K to match
+    # a model's documented sampling and RECORD IT alongside the score.
+    s = resolve("LCB")
     kwargs = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-        "top_p": 0.95,
         "max_tokens": max_tokens,
+        **to_openai_kwargs(s),
     }
-    if model.startswith("protolabs/") or model == "local":
-        kwargs["extra_body"] = {
-            "chat_template_kwargs": {"enable_thinking": False},
-            "top_k": 20, "min_p": 0.0,
-        }
+    if force_no_think:
+        kwargs["extra_body"]["chat_template_kwargs"] = {"enable_thinking": False}
+    elif force_think:
+        kwargs["extra_body"]["chat_template_kwargs"] = {"enable_thinking": True}
     try:
         resp = client.chat.completions.create(**kwargs)
         msg = resp.choices[0].message
         content = msg.content or ""
-        if not content:
+        # Code lives in `content` (after any </think>) when the model finished. If content is
+        # empty the model burned the whole budget mid-think → fall back to reasoning_content
+        # (usually no code fence → scores 0, the correct "didn't solve in budget" outcome).
+        if "</think>" in content:
+            content = content.split("</think>")[-1]
+        if not content.strip():
             rc = getattr(msg, "reasoning_content", None) or ""
             psf = getattr(msg, "provider_specific_fields", {}) or {}
             content = rc or psf.get("reasoning_content", "") or psf.get("reasoning", "")
-        return content
+        usage = getattr(resp, "usage", None)
+        ntok = getattr(usage, "completion_tokens", 0) if usage else 0
+        return content, ntok
     except Exception as e:
-        return f"__MODEL_ERROR__ {e}"
+        return f"__MODEL_ERROR__ {e}", 0
 
 
 # --------------------------------------------------------------------------------------
@@ -398,10 +420,17 @@ def call_model(client, model: str, prompt: str, max_tokens: int) -> str:
 @click.option("--max-tests", default=20, type=int, help="Max test cases graded per problem")
 @click.option("--per-test-timeout", default=6, type=int, help="Wall-clock seconds per test")
 @click.option("--problem-budget", default=90.0, type=float, help="Max wall seconds spent grading one problem")
-@click.option("--max-tokens", default=16384, type=int, help="Max output tokens per solution")
+@click.option("--max-tokens", default=32768, type=int,
+              help="Max output tokens per solution (prod budget; hard cap — no solution within it = 0)")
+@click.option("--no-thinking", is_flag=True,
+              help="Force thinking off (measure the base/non-thinking coding path). Default: prod-representative "
+                   "(the lane's own thinking default under the --max-tokens budget).")
+@click.option("--thinking", is_flag=True,
+              help="Force thinking ON (for agentic-thinker coders whose lane defaults thinking off, e.g. Laguna). "
+                   "Mutually exclusive with --no-thinking.")
 @click.option("--output-dir", type=click.Path(), default=None, help="Directory to write result JSON")
 def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
-         max_tests, per_test_timeout, problem_budget, max_tokens, output_dir):
+         max_tests, per_test_timeout, problem_budget, max_tokens, no_thinking, thinking, output_dir):
     """Run the LiveCodeBench code-generation suite against a model endpoint."""
     from openai import OpenAI
 
@@ -430,12 +459,22 @@ def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
     click.echo(f"Model: {model} @ {gateway_url}  (max-tests/problem={max_tests}, per-test-timeout={per_test_timeout}s)")
     click.echo("=" * 64)
 
-    client = OpenAI(base_url=gateway_url, api_key=api_key)
+    # 600s client timeout accommodates a full 32k-token reasoning trace (~200-300s) without
+    # cutting generation short of the code block.
+    if no_thinking and thinking:
+        click.echo("--no-thinking and --thinking are mutually exclusive.")
+        sys.exit(1)
+    client = OpenAI(base_url=gateway_url, api_key=api_key, timeout=600.0)
+    think_mode = ("thinking OFF (forced)" if no_thinking else
+                  "thinking ON (forced)" if thinking else "prod-representative (lane default)")
+    click.echo(f"Budget: {max_tokens} tok/solution · {think_mode}")
+    click.echo(f"Sampling: {resolve('LCB').summary()}")
     results = []
     for i, problem in enumerate(problems, 1):
         prompt = build_prompt(problem)
         t0 = time.time()
-        output = call_model(client, model, prompt, max_tokens)
+        output, ntok = call_model(client, model, prompt, max_tokens,
+                                   force_no_think=no_thinking, force_think=thinking)
         gr = grade_problem(problem, output, max_tests, per_test_timeout, problem_budget)
         dt = time.time() - t0
         results.append({
@@ -443,6 +482,7 @@ def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
             "title": problem["title"],
             "platform": problem["platform"],
             "difficulty": problem["difficulty"],
+            "tokens": ntok,
             "contest_date": problem["contest_date"],
             "testtype": gr["testtype"],
             "avg_score": gr["score"],
@@ -451,16 +491,23 @@ def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
             "error": gr.get("error"),
             "duration_s": round(dt, 1),
         })
+        nocode = " NO-CODE" if gr.get("error") == "no code in output" else ""
         click.echo(f"[{i:>2}/{len(problems)}] {problem['platform']:>8} {problem['difficulty']:>6} "
                    f"{problem['title'][:40]:<40} {gr['passed']:>2}/{gr['total']:<2} "
-                   f"score={gr['score']:.2f}  {dt:.0f}s")
+                   f"score={gr['score']:.2f}  {ntok:>5}tok  {dt:.0f}s{nocode}")
 
     mean = sum(r["avg_score"] for r in results) / len(results)
     solved = sum(1 for r in results if r["avg_score"] == 1.0)
+    avg_tokens = sum(r["tokens"] for r in results) / len(results)
+    # "no code in output" at the budget = didn't solve within the cap (a real failure), but track
+    # it separately so a harness/format regression can't hide as genuine wrong answers.
+    nocode_n = sum(1 for r in results if r.get("error") == "no code in output")
     click.echo("=" * 64)
     click.echo(f"Mean score (avg fraction of tests passed): {mean:.3f}")
     click.echo(f"Fully solved (all tests): {solved}/{len(results)}  "
                f"({solved/len(results):.0%})   [pass@1, contamination-resistant hard]")
+    click.echo(f"Avg tokens/solution: {avg_tokens:.0f} (efficiency signal, not scored)   "
+               f"no-code-in-budget: {nocode_n}/{len(results)}")
 
     if output_dir:
         out = Path(output_dir)
@@ -473,6 +520,8 @@ def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
                 "version_tag": version_tag, "min_date": min_date,
                 "difficulty": difficulties, "limit": limit,
                 "max_tests": max_tests, "per_test_timeout": per_test_timeout,
+                "max_tokens": max_tokens, "thinking": ("off" if no_thinking else "prod-default"),
+                "sampling": resolve("LCB").as_dict(),
             },
             "date_range": [min(dates), max(dates)],
             "platform_mix": plat,
@@ -483,6 +532,8 @@ def main(model, gateway_url, api_key, version_tag, min_date, difficulty, limit,
                 "mean_score": mean,
                 "fully_solved": solved,
                 "solve_rate": solved / len(results),
+                "avg_tokens": round(avg_tokens),
+                "no_code_in_budget": nocode_n,
             },
         }
         f = out / "livecodebench_results.json"

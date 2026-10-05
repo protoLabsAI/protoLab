@@ -1,0 +1,23 @@
+{
+ "suite": "emotion",
+ "family": "sentiment",
+ "options": [
+  "sadness",
+  "joy",
+  "love",
+  "anger",
+  "fear",
+  "surprise"
+ ],
+ "question": "Which emotion does this message express?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.32666666666666666
+}

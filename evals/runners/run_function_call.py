@@ -23,6 +23,8 @@ import yaml
 from graders.function_call import FunctionCallGrader
 from openai import AuthenticationError, OpenAI
 
+from sampling import resolve, to_openai_kwargs
+
 SUITE_DIR = Path(__file__).parent.parent / "function_call" / "test_cases"
 ALIAS_TIERS_PATH = Path(__file__).parent.parent.parent / "models" / "alias_tiers.yaml"
 
@@ -49,21 +51,24 @@ def run_function_call_test(client: OpenAI, model: str, test: dict, temperature: 
 
     try:
         # extra_body only for local vLLM models (cloud APIs reject it)
+        # NOTE: cloud APIs reject extra_body, so local lanes and cloud judges do
+        # NOT get identical sampling here. That asymmetry is deliberate but real —
+        # it is recorded in the results so a cross-provider comparison can see it.
+        samp = resolve("FC")
         kwargs: dict = {}
         if model.startswith("protolabs/"):
+            ok = to_openai_kwargs(samp)
             kwargs["extra_body"] = {
                 "chat_template_kwargs": {"enable_thinking": False},
-                "top_k": 20,
-                "min_p": 0.0,
-                "presence_penalty": 1.5,
-                "repetition_penalty": 1.0,
+                **ok["extra_body"],
+                "presence_penalty": samp.presence_penalty,
             }
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             tools=tools,
             temperature=temperature,
-            top_p=0.8,
+            top_p=samp.top_p,
             max_tokens=8000,  # raised from 1000: thinking models (Ornith etc.) need
                               # room to close <think> before the tool call (no-thinking-off policy)
             **kwargs,

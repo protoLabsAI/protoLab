@@ -1,0 +1,19 @@
+{
+ "suite": "qnli",
+ "family": "nli",
+ "options": [
+  "yes",
+  "no"
+ ],
+ "question": "Does the passage contain the answer to the question?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.5566666666666666
+}

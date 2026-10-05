@@ -1,0 +1,20 @@
+{
+ "suite": "finnews",
+ "family": "sentiment",
+ "options": [
+  "bearish",
+  "bullish",
+  "neutral"
+ ],
+ "question": "What is the market sentiment of this financial news headline?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.6733333333333333
+}

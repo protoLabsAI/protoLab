@@ -1,0 +1,21 @@
+{
+ "suite": "agnews",
+ "family": "topic",
+ "options": [
+  "world",
+  "sports",
+  "business",
+  "technology"
+ ],
+ "question": "Which section of a newspaper does this story belong to?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.29
+}

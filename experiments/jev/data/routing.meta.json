@@ -1,0 +1,24 @@
+{
+ "suite": "routing",
+ "options": [
+  "ACCOUNT",
+  "CANCEL",
+  "CONTACT",
+  "DELIVERY",
+  "FEEDBACK",
+  "INVOICE",
+  "ORDER",
+  "PAYMENT",
+  "REFUND",
+  "SHIPPING",
+  "SUBSCRIPTION"
+ ],
+ "question": "Which support queue should this customer message be routed to?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "family": "topic"
+}

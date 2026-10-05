@@ -1,0 +1,278 @@
+== 1. RISK-COVERAGE (raw probabilities, no calibration) ==
+selective accuracy = accuracy on the items the arm is most confident about.
+AURC = mean error over all coverages; LOWER is better. Bootstrap CI = 2000 resamples.
+
+arm                  suite         acc  sel@95  sel@90  sel@80  sel@50   AURC         [95% CI]
+----------------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection   0.397   0.418   0.437   0.475   0.693  0.288 [ 0.233, 0.351]
+Qwen3.5-0.8B-name    sentiment   0.727   0.744   0.748   0.775   0.927  0.115 [ 0.083, 0.157]
+Qwen3.5-0.8B-name    routing     0.617   0.632   0.648   0.692   0.840  0.197 [ 0.147, 0.252]
+Qwen3.5-0.8B-name    langid      0.323   0.333   0.337   0.338   0.400  0.585 [ 0.503, 0.666]
+
+Qwen3.5-2B-letter    injection   0.820   0.849   0.870   0.917   0.980  0.045 [ 0.027, 0.068]
+Qwen3.5-2B-letter    sentiment   0.870   0.884   0.900   0.929   0.953  0.057 [ 0.028, 0.092]
+Qwen3.5-2B-letter    routing     0.367   0.375   0.381   0.392   0.447  0.552 [ 0.477, 0.630]
+Qwen3.5-2B-letter    langid      0.100   0.091   0.081   0.079   0.080  0.921 [ 0.879, 0.957]
+
+Qwen3.5-2B-name      injection   0.767   0.782   0.800   0.858   0.940  0.076 [ 0.052, 0.105]
+Qwen3.5-2B-name      sentiment   0.817   0.846   0.856   0.887   0.940  0.066 [ 0.042, 0.096]
+Qwen3.5-2B-name      routing     0.637   0.660   0.681   0.696   0.813  0.179 [ 0.137, 0.226]
+Qwen3.5-2B-name      langid      0.503   0.523   0.548   0.592   0.800  0.226 [ 0.180, 0.282]
+
+Qwen3.5-4B-letter    injection   0.723   0.744   0.763   0.792   0.953  0.093 [ 0.065, 0.124]
+Qwen3.5-4B-letter    sentiment   0.937   0.947   0.956   0.967   0.980  0.019 [ 0.007, 0.032]
+Qwen3.5-4B-letter    routing     0.673   0.688   0.715   0.729   0.853  0.227 [ 0.165, 0.299]
+Qwen3.5-4B-letter    langid      0.570   0.579   0.600   0.650   0.773  0.237 [ 0.188, 0.297]
+
+Qwen3.5-4B-name      injection   0.833   0.846   0.859   0.896   0.960  0.063 [ 0.037, 0.095]
+Qwen3.5-4B-name      sentiment   0.947   0.961   0.967   0.979   1.000  0.010 [ 0.004, 0.017]
+Qwen3.5-4B-name      routing     0.730   0.758   0.781   0.808   0.847  0.162 [ 0.112, 0.217]
+Qwen3.5-4B-name      langid      0.953   0.965   0.970   0.979   0.993  0.011 [ 0.003, 0.021]
+
+embed-head           injection   0.890   0.902   0.922   0.938   0.980  0.036 [ 0.017, 0.060]
+embed-head           sentiment   0.857   0.874   0.900   0.925   0.973  0.040 [ 0.023, 0.060]
+embed-head           routing     0.960   0.979   0.993   1.000   1.000  0.002 [ 0.001, 0.005]
+embed-head           langid      0.720   0.744   0.778   0.804   0.967  0.087 [ 0.062, 0.117]
+
+smart-letter         injection   0.910   0.933   0.948   0.967   0.987  0.017 [ 0.008, 0.028]
+smart-letter         sentiment   0.943   0.968   0.974   0.975   0.987  0.019 [ 0.005, 0.041]
+smart-letter         routing     0.807   0.814   0.833   0.838   0.920  0.084 [ 0.057, 0.116]
+smart-letter         langid      0.873   0.895   0.915   0.958   1.000  0.020 [ 0.011, 0.030]
+
+smart-name           injection   0.893   0.909   0.933   0.975   0.987  0.020 [ 0.010, 0.033]
+smart-name           sentiment   0.957   0.968   0.978   0.983   0.980  0.016 [ 0.003, 0.035]
+smart-name           routing     0.803   0.818   0.830   0.858   0.887  0.107 [ 0.072, 0.151]
+smart-name           langid      0.993   1.000   1.000   1.000   1.000  0.000 [ 0.000, 0.000]
+
+== 2. DOES TEMPERATURE SCALING IMPROVE DEFERRAL? (dAURC vs raw; negative = better) ==
+Temperature never moves the argmax, so accuracy is fixed. It CAN reorder confidence
+across items, so AURC can move. If it does not, calibration is cosmetic for routing.
+
+arm                  suite       AURC raw |             dAURC T-in |           dAURC T-loso
+-------------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection     0.2881 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-0.8B-name    sentiment     0.1151 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-0.8B-name    routing       0.1970 | +0.0031 [-0.0002,+0.0067] n.s.   | +0.0205 [+0.0069,+0.0348] WORSE 
+Qwen3.5-0.8B-name    langid        0.5851 | -0.0289 [-0.0491,-0.0081] better | -0.0366 [-0.0601,-0.0126] better
+Qwen3.5-2B-letter    injection     0.0450 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-2B-letter    sentiment     0.0570 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-2B-letter    routing       0.5516 | -0.0050 [-0.0099,-0.0003] better | -0.0119 [-0.0211,-0.0036] better
+Qwen3.5-2B-letter    langid        0.9208 | -0.0233 [-0.0385,-0.0106] better | -0.0026 [-0.0054,-0.0002] better
+Qwen3.5-2B-name      injection     0.0759 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-2B-name      sentiment     0.0658 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-2B-name      routing       0.1788 | -0.0011 [-0.0032,+0.0008] n.s.   | +0.0046 [+0.0001,+0.0092] WORSE 
+Qwen3.5-2B-name      langid        0.2260 | -0.0000 [-0.0010,+0.0009] n.s.   | +0.0047 [-0.0003,+0.0101] n.s.  
+Qwen3.5-4B-letter    injection     0.0928 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-4B-letter    sentiment     0.0187 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-4B-letter    routing       0.2272 | +0.0097 [+0.0051,+0.0156] WORSE  | +0.0150 [+0.0085,+0.0230] WORSE 
+Qwen3.5-4B-letter    langid        0.2373 | -0.0115 [-0.0195,-0.0052] better | -0.0121 [-0.0205,-0.0057] better
+Qwen3.5-4B-name      injection     0.0634 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-4B-name      sentiment     0.0096 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+Qwen3.5-4B-name      routing       0.1623 | +0.0092 [+0.0026,+0.0166] WORSE  | +0.0027 [-0.0010,+0.0067] n.s.  
+Qwen3.5-4B-name      langid        0.0107 | +0.0002 [-0.0000,+0.0005] n.s.   | +0.0038 [+0.0005,+0.0079] WORSE 
+embed-head           injection     0.0357 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+embed-head           sentiment     0.0397 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+embed-head           routing       0.0024 | -0.0007 [-0.0019,+0.0000] n.s.   | -0.0008 [-0.0019,+0.0000] n.s.  
+embed-head           langid        0.0872 | -0.0140 [-0.0236,-0.0060] better | -0.0061 [-0.0097,-0.0031] better
+smart-letter         injection     0.0168 | -0.0000 [-0.0002,+0.0001] n.s.   | -0.0000 [-0.0001,+0.0001] n.s.  
+smart-letter         sentiment     0.0195 | -0.0000 [-0.0001,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+smart-letter         routing       0.0842 | +0.0045 [+0.0022,+0.0072] WORSE  | +0.0011 [+0.0003,+0.0021] WORSE 
+smart-letter         langid        0.0196 | +0.0010 [+0.0002,+0.0021] WORSE  | +0.0013 [+0.0003,+0.0024] WORSE 
+smart-name           injection     0.0202 | -0.0000 [-0.0002,+0.0002] n.s.   | +0.0000 [-0.0001,+0.0001] n.s.  
+smart-name           sentiment     0.0164 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+smart-name           routing       0.1075 | +0.0052 [+0.0008,+0.0100] WORSE  | -0.0000 [-0.0001,+0.0001] n.s.  
+smart-name           langid        0.0001 | +0.0000 [+0.0000,+0.0000] n.s.   | +0.0000 [+0.0000,+0.0000] n.s.  
+
+cells=32  T-in: better 5, WORSE 5  |  T-loso: better 5, WORSE 6  (rest not significant)
+
+== 3. CASCADE: arm answers what it is confident about, defers the rest to smart-name ==
+Exact simulation: every arm ran the same id-aligned test items (verified).
+'defer%' is the share of items that cost a 27B call. 'match@' = smallest deferral
+rate on this grid whose accuracy reaches smart-name alone (-- = never on the grid).
+
+arm                  suite       alone    d=0%   d=10%   d=20%   d=30%   d=50% 27B alone  match@
+------------------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection   0.397   0.397   0.490   0.567   0.660   0.807     0.893      --
+Qwen3.5-0.8B-name    sentiment   0.727   0.727   0.770   0.817   0.870   0.940     0.957      --
+Qwen3.5-0.8B-name    routing     0.617   0.617   0.670   0.717   0.760   0.813     0.803     50%
+Qwen3.5-0.8B-name    langid      0.323   0.323   0.400   0.467   0.540   0.693     0.993      --
+
+Qwen3.5-2B-letter    injection   0.820   0.820   0.877   0.910   0.927   0.910     0.893     20%
+Qwen3.5-2B-letter    sentiment   0.870   0.870   0.900   0.923   0.940   0.950     0.957      --
+Qwen3.5-2B-letter    routing     0.367   0.367   0.420   0.473   0.527   0.643     0.803      --
+Qwen3.5-2B-letter    langid      0.100   0.100   0.173   0.260   0.347   0.533     0.993      --
+
+Qwen3.5-2B-name      injection   0.767   0.767   0.820   0.870   0.883   0.900     0.893     50%
+Qwen3.5-2B-name      sentiment   0.817   0.817   0.867   0.897   0.917   0.943     0.957      --
+Qwen3.5-2B-name      routing     0.637   0.637   0.687   0.710   0.730   0.797     0.803      --
+Qwen3.5-2B-name      langid      0.503   0.503   0.590   0.667   0.740   0.893     0.993      --
+
+Qwen3.5-4B-letter    injection   0.723   0.723   0.787   0.833   0.887   0.917     0.893     50%
+Qwen3.5-4B-letter    sentiment   0.937   0.937   0.950   0.953   0.957   0.957     0.957     30%
+Qwen3.5-4B-letter    routing     0.673   0.673   0.730   0.743   0.780   0.813     0.803     50%
+Qwen3.5-4B-letter    langid      0.570   0.570   0.640   0.713   0.783   0.880     0.993      --
+
+Qwen3.5-4B-name      injection   0.833   0.833   0.860   0.897   0.923   0.913     0.893     20%
+Qwen3.5-4B-name      sentiment   0.947   0.947   0.953   0.957   0.953   0.957     0.957     20%
+Qwen3.5-4B-name      routing     0.730   0.730   0.763   0.780   0.800   0.800     0.803      --
+Qwen3.5-4B-name      langid      0.953   0.953   0.973   0.983   0.990   0.990     0.993      --
+
+embed-head           injection   0.890   0.890   0.907   0.903   0.903   0.900     0.893     10%
+embed-head           sentiment   0.857   0.857   0.903   0.930   0.937   0.957     0.957     50%
+embed-head           routing     0.960   0.960   0.963   0.947   0.937   0.913     0.803      0%
+embed-head           langid      0.720   0.720   0.800   0.843   0.893   0.983     0.993      --
+
+smart-letter         injection   0.910   0.910   0.937   0.923   0.910   0.900     0.893      0%
+smart-letter         sentiment   0.943   0.943   0.957   0.957   0.957   0.957     0.957     10%
+smart-letter         routing     0.807   0.807   0.807   0.797   0.803   0.803     0.803      0%
+smart-letter         langid      0.873   0.873   0.923   0.967   0.990   0.993     0.993     50%
+
+== 4. POOLED CASCADE vs smart-name ALONE (all four suites, equal n) ==
+Macro-average over 4 suites of 300 items. Paired bootstrap resamples items WITHIN
+each suite, so the comparison is on the same items both arms saw. A positive delta
+means the cascade beat smart-name while paying only 'defer%' of the 27B calls.
+
+arm                  defer% pooled acc           d vs 27B alone
+---------------------------------------------------------------
+smart-name alone        100      0.912                       --
+Qwen3.5-0.8B-name        0%      0.516 -0.396 [-0.424,-0.367] worse    
+Qwen3.5-0.8B-name       10%      0.583 -0.328 [-0.355,-0.301] worse    
+Qwen3.5-0.8B-name       20%      0.642 -0.269 [-0.292,-0.245] worse    
+Qwen3.5-0.8B-name       30%      0.708 -0.205 [-0.230,-0.182] worse    
+Qwen3.5-0.8B-name       50%      0.813 -0.100 [-0.117,-0.083] worse    
+
+Qwen3.5-2B-letter        0%      0.539 -0.372 [-0.396,-0.349] worse    
+Qwen3.5-2B-letter       10%      0.593 -0.318 [-0.339,-0.297] worse    
+Qwen3.5-2B-letter       20%      0.642 -0.270 [-0.288,-0.251] worse    
+Qwen3.5-2B-letter       30%      0.685 -0.226 [-0.242,-0.210] worse    
+Qwen3.5-2B-letter       50%      0.759 -0.153 [-0.165,-0.141] worse    
+
+Qwen3.5-2B-name          0%      0.681 -0.230 [-0.257,-0.204] worse    
+Qwen3.5-2B-name         10%      0.741 -0.171 [-0.196,-0.147] worse    
+Qwen3.5-2B-name         20%      0.786 -0.127 [-0.151,-0.105] worse    
+Qwen3.5-2B-name         30%      0.817 -0.094 [-0.114,-0.074] worse    
+Qwen3.5-2B-name         50%      0.883 -0.031 [-0.046,-0.018] worse    
+
+Qwen3.5-4B-letter        0%      0.726 -0.186 [-0.212,-0.160] worse    
+Qwen3.5-4B-letter       10%      0.777 -0.135 [-0.159,-0.111] worse    
+Qwen3.5-4B-letter       20%      0.811 -0.099 [-0.121,-0.076] worse    
+Qwen3.5-4B-letter       30%      0.852 -0.059 [-0.079,-0.040] worse    
+Qwen3.5-4B-letter       50%      0.892 -0.022 [-0.034,-0.011] worse    
+
+Qwen3.5-4B-name          0%      0.866 -0.046 [-0.065,-0.027] worse    
+Qwen3.5-4B-name         10%      0.887 -0.024 [-0.040,-0.008] worse    
+Qwen3.5-4B-name         20%      0.904 -0.007 [-0.021,+0.006] n.s.     
+Qwen3.5-4B-name         30%      0.917 +0.004 [-0.007,+0.015] n.s.     
+Qwen3.5-4B-name         50%      0.915 +0.003 [-0.003,+0.009] n.s.     
+
+embed-head               0%      0.857 -0.055 [-0.079,-0.031] worse    
+embed-head              10%      0.893 -0.020 [-0.042,+0.001] n.s.     
+embed-head              20%      0.906 -0.006 [-0.026,+0.014] n.s.     
+embed-head              30%      0.917 +0.007 [-0.011,+0.025] n.s.     
+embed-head              50%      0.938 +0.026 [+0.014,+0.038] BEATS 27B
+
+smart-letter             0%      0.883 -0.028 [-0.046,-0.012] worse    
+smart-letter            10%      0.906 -0.005 [-0.019,+0.008] n.s.     
+smart-letter            20%      0.911 +0.001 [-0.009,+0.011] n.s.     
+smart-letter            30%      0.915 +0.003 [-0.002,+0.009] n.s.     
+smart-letter            50%      0.913 +0.002 [+0.000,+0.005] n.s.     
+
+== 5. THRESHOLD TRANSFER (the deployable cascade) ==
+Sections 3-4 defer a FIXED FRACTION of test items — that silently uses the test set to
+locate the cut. In production you fit one confidence threshold offline and live with
+whatever coverage it yields. Here tau is the target-quantile of max-prob on the arm's
+CALIB split, applied unchanged to test. 'got%' is the deferral rate it actually bought.
+
+arm                  suite      want%  got% acc(tau) acc(oracle)     gap
+------------------------------------------------------------------------
+Qwen3.5-0.8B-name    injection    10%   15%    0.520       0.490  +0.030
+Qwen3.5-0.8B-name    injection    20%   21%    0.570       0.567  +0.003
+Qwen3.5-0.8B-name    injection    30%   29%    0.647       0.660  -0.013
+Qwen3.5-0.8B-name    sentiment    10%    8%    0.770       0.770  +0.000
+Qwen3.5-0.8B-name    sentiment    20%   17%    0.810       0.817  -0.007
+Qwen3.5-0.8B-name    sentiment    30%   30%    0.870       0.870  +0.000
+Qwen3.5-0.8B-name    routing      10%   10%    0.670       0.670  +0.000
+Qwen3.5-0.8B-name    routing      20%   17%    0.707       0.717  -0.010
+Qwen3.5-0.8B-name    routing      30%   24%    0.727       0.760  -0.033
+Qwen3.5-0.8B-name    langid       10%    8%    0.390       0.400  -0.010
+Qwen3.5-0.8B-name    langid       20%   16%    0.447       0.467  -0.020
+Qwen3.5-0.8B-name    langid       30%   25%    0.503       0.540  -0.037
+
+Qwen3.5-2B-letter    injection    10%    9%    0.873       0.877  -0.003
+Qwen3.5-2B-letter    injection    20%   15%    0.897       0.910  -0.013
+Qwen3.5-2B-letter    injection    30%   26%    0.917       0.927  -0.010
+Qwen3.5-2B-letter    sentiment    10%    8%    0.893       0.900  -0.007
+Qwen3.5-2B-letter    sentiment    20%   17%    0.913       0.923  -0.010
+Qwen3.5-2B-letter    sentiment    30%   29%    0.940       0.940  +0.000
+Qwen3.5-2B-letter    routing      10%    8%    0.417       0.420  -0.003
+Qwen3.5-2B-letter    routing      20%   16%    0.457       0.473  -0.017
+Qwen3.5-2B-letter    routing      30%   25%    0.503       0.527  -0.023
+Qwen3.5-2B-letter    langid       10%   10%    0.170       0.173  -0.003
+Qwen3.5-2B-letter    langid       20%   25%    0.310       0.260  +0.050
+Qwen3.5-2B-letter    langid       30%   36%    0.400       0.347  +0.053
+
+Qwen3.5-2B-name      injection    10%    8%    0.810       0.820  -0.010
+Qwen3.5-2B-name      injection    20%   14%    0.843       0.870  -0.027
+Qwen3.5-2B-name      injection    30%   22%    0.870       0.883  -0.013
+Qwen3.5-2B-name      sentiment    10%    7%    0.857       0.867  -0.010
+Qwen3.5-2B-name      sentiment    20%   19%    0.893       0.897  -0.003
+Qwen3.5-2B-name      sentiment    30%   33%    0.923       0.917  +0.007
+Qwen3.5-2B-name      routing      10%    9%    0.690       0.687  +0.003
+Qwen3.5-2B-name      routing      20%   14%    0.697       0.710  -0.013
+Qwen3.5-2B-name      routing      30%   23%    0.713       0.730  -0.017
+Qwen3.5-2B-name      langid       10%   11%    0.597       0.590  +0.007
+Qwen3.5-2B-name      langid       20%   20%    0.663       0.667  -0.003
+Qwen3.5-2B-name      langid       30%   29%    0.733       0.740  -0.007
+
+Qwen3.5-4B-letter    injection    10%   10%    0.787       0.787  +0.000
+Qwen3.5-4B-letter    injection    20%   16%    0.817       0.833  -0.017
+Qwen3.5-4B-letter    injection    30%   29%    0.883       0.887  -0.003
+Qwen3.5-4B-letter    sentiment    10%    4%    0.947       0.950  -0.003
+Qwen3.5-4B-letter    sentiment    20%   12%    0.950       0.953  -0.003
+Qwen3.5-4B-letter    sentiment    30%   28%    0.953       0.957  -0.003
+Qwen3.5-4B-letter    routing      10%    7%    0.713       0.730  -0.017
+Qwen3.5-4B-letter    routing      20%   22%    0.753       0.743  +0.010
+Qwen3.5-4B-letter    routing      30%   33%    0.787       0.780  +0.007
+Qwen3.5-4B-letter    langid       10%   14%    0.667       0.640  +0.027
+Qwen3.5-4B-letter    langid       20%   17%    0.690       0.713  -0.023
+Qwen3.5-4B-letter    langid       30%   31%    0.787       0.783  +0.003
+
+Qwen3.5-4B-name      injection    10%    7%    0.853       0.860  -0.007
+Qwen3.5-4B-name      injection    20%   21%    0.903       0.897  +0.007
+Qwen3.5-4B-name      injection    30%   27%    0.920       0.923  -0.003
+Qwen3.5-4B-name      sentiment    10%    7%    0.953       0.953  +0.000
+Qwen3.5-4B-name      sentiment    20%   14%    0.957       0.957  +0.000
+Qwen3.5-4B-name      sentiment    30%   26%    0.953       0.953  +0.000
+Qwen3.5-4B-name      routing      10%    8%    0.753       0.763  -0.010
+Qwen3.5-4B-name      routing      20%   19%    0.780       0.780  +0.000
+Qwen3.5-4B-name      routing      30%   31%    0.803       0.800  +0.003
+Qwen3.5-4B-name      langid       10%   10%    0.973       0.973  +0.000
+Qwen3.5-4B-name      langid       20%   23%    0.983       0.983  +0.000
+Qwen3.5-4B-name      langid       30%   37%    0.993       0.990  +0.003
+
+embed-head           injection    10%   17%    0.910       0.907  +0.003
+embed-head           injection    20%   28%    0.907       0.903  +0.003
+embed-head           injection    30%   37%    0.907       0.903  +0.003
+embed-head           sentiment    10%    9%    0.903       0.903  +0.000
+embed-head           sentiment    20%   22%    0.927       0.930  -0.003
+embed-head           sentiment    30%   31%    0.943       0.937  +0.007
+embed-head           routing      10%    7%    0.963       0.963  +0.000
+embed-head           routing      20%   16%    0.953       0.947  +0.007
+embed-head           routing      30%   25%    0.940       0.937  +0.003
+embed-head           langid       10%   12%    0.810       0.800  +0.010
+embed-head           langid       20%   17%    0.823       0.843  -0.020
+embed-head           langid       30%   35%    0.917       0.893  +0.023
+
+smart-letter         injection    10%   17%    0.940       0.937  +0.003
+smart-letter         injection    20%   27%    0.920       0.923  -0.003
+smart-letter         injection    30%   35%    0.907       0.910  -0.003
+smart-letter         sentiment    10%    7%    0.957       0.957  +0.000
+smart-letter         sentiment    20%   19%    0.957       0.957  +0.000
+smart-letter         sentiment    30%   26%    0.957       0.957  +0.000
+smart-letter         routing      10%    8%    0.803       0.807  -0.003
+smart-letter         routing      20%   18%    0.800       0.797  +0.003
+smart-letter         routing      30%   33%    0.807       0.803  +0.003
+smart-letter         langid       10%   12%    0.937       0.923  +0.013
+smart-letter         langid       20%   21%    0.970       0.967  +0.003
+smart-letter         langid       30%   31%    0.990       0.990  +0.000
+

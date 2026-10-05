@@ -1,0 +1,20 @@
+{
+ "suite": "tweetsent",
+ "family": "sentiment",
+ "options": [
+  "negative",
+  "neutral",
+  "positive"
+ ],
+ "question": "What is the sentiment of this tweet?",
+ "sizes": {
+  "test": 300,
+  "calib": 200,
+  "train": 1000
+ },
+ "seed": 20260919,
+ "source": {
+  "note": "see prep_data_v2.py for the exact construction"
+ },
+ "test_majority": 0.43
+}

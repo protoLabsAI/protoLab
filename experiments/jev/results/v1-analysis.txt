@@ -1,0 +1,165 @@
+== RUNG 1: 22 tasks, 6 families, 8 arms ==
+families: language(1)  nli(5)  ordinal(3)  safety(4)  sentiment(4)  topic(5)
+
+== 1. BOARD — accuracy and AURC, macro-averaged within family ==
+AURC lower is better. 'all' is the macro-average over the 22 tasks.
+
+arm                  metric  language       nli   ordinal    safety sentiment     topic     all
+-----------------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    acc        0.323     0.658     0.181     0.399     0.444     0.489   0.453
+                     AURC      0.5851    0.2432    0.7541    0.4521    0.3978    0.3168  0.4112
+Qwen3.5-2B-letter    acc        0.100     0.476     0.161     0.608     0.538     0.365   0.426
+                     AURC      0.9208    0.4116    0.8610    0.3034    0.3077    0.4502  0.4662
+Qwen3.5-2B-name      acc        0.503     0.613     0.282     0.611     0.532     0.541   0.532
+                     AURC      0.2260    0.2738    0.6239    0.3037    0.2965    0.2915  0.3329
+Qwen3.5-4B-letter    acc        0.570     0.719     0.421     0.690     0.627     0.702   0.646
+                     AURC      0.2373    0.1686    0.4435    0.1615    0.2289    0.1505  0.2148
+Qwen3.5-4B-name      acc        0.953     0.799     0.519     0.736     0.676     0.748   0.722
+                     AURC      0.0107    0.1005    0.3450    0.1531    0.2078    0.1198  0.1632
+embed-head           acc        0.720     0.599     0.519     0.813     0.694     0.812   0.698
+                     AURC      0.0872    0.3476    0.3790    0.0917    0.1734    0.0702  0.1988
+smart-letter         acc        0.873     0.843     0.527     0.774     0.699     0.789   0.750
+                     AURC      0.0196    0.0666    0.3141    0.1176    0.1740    0.0764  0.1292
+smart-name           acc        0.993     0.861     0.602     0.778     0.726     0.815   0.782
+                     AURC      0.0001    0.0514    0.2695    0.1080    0.1552    0.0752  0.1134
+
+== 2. CASCADE at 22 tasks — Qwen3.5-4B-name defers to smart-name ==
+Macro-average over 22 tasks. Paired bootstrap resamples items within each task.
+
+arm                  defer% pooled acc             d vs 27B alone
+-----------------------------------------------------------------
+smart-name alone        100      0.782                         --
+Qwen3.5-4B-name          0%      0.722 -0.059 [-0.069,-0.050] worse
+Qwen3.5-4B-name         10%      0.742                           
+Qwen3.5-4B-name         20%      0.758 -0.024 [-0.032,-0.016] worse
+Qwen3.5-4B-name         30%      0.768 -0.014 [-0.020,-0.007] worse
+Qwen3.5-4B-name         50%      0.778 -0.004 [-0.008,-0.000] worse
+
+embed-head               0%      0.698 -0.083 [-0.096,-0.070] worse
+embed-head              10%      0.726                           
+embed-head              20%      0.741 -0.040 [-0.051,-0.029] worse
+embed-head              30%      0.755 -0.026 [-0.035,-0.016] worse
+embed-head              50%      0.772 -0.009 [-0.017,-0.001] worse
+
+Qwen3.5-2B-name          0%      0.532 -0.250 [-0.263,-0.238] worse
+Qwen3.5-2B-name         10%      0.575                           
+Qwen3.5-2B-name         20%      0.615 -0.167 [-0.179,-0.156] worse
+Qwen3.5-2B-name         30%      0.653 -0.130 [-0.141,-0.120] worse
+Qwen3.5-2B-name         50%      0.713 -0.069 [-0.077,-0.061] worse
+
+== 3. LEAVE-ONE-FAMILY-OUT CALIBRATION — the test rung 1 exists for ==
+T-lofo: one temperature fitted on the calib splits of the OTHER FIVE families, applied
+to every task in the held-out family. This is the claim a general decision model makes.
+cond: the same, with a per-item temperature from decode-time features.
+
+arm                  held-out family   ECE raw  T-lofo    cond            d lofo vs raw
+---------------------------------------------------------------------------------------
+Qwen3.5-0.8B-name    language            0.222   0.161   0.071 -0.064 [-0.159,+0.028] n.s.  
+Qwen3.5-0.8B-name    nli                 0.099   0.108   0.138 +0.004 [-0.023,+0.028] n.s.  
+Qwen3.5-0.8B-name    ordinal             0.296   0.108   0.133 -0.186 [-0.195,-0.171] better
+Qwen3.5-0.8B-name    safety              0.501   0.401   0.334 -0.103 [-0.122,-0.086] better
+Qwen3.5-0.8B-name    sentiment           0.391   0.181   0.163 -0.204 [-0.224,-0.182] better
+Qwen3.5-0.8B-name    topic               0.193   0.321   0.181 +0.118 [+0.084,+0.152] WORSE 
+
+Qwen3.5-2B-letter    language            0.680   0.130   0.647 -0.552 [-0.566,-0.537] better
+Qwen3.5-2B-letter    nli                 0.287   0.175   0.201 -0.111 [-0.122,-0.096] better
+Qwen3.5-2B-letter    ordinal             0.428   0.164   0.170 -0.265 [-0.271,-0.256] better
+Qwen3.5-2B-letter    safety              0.188   0.158   0.164 -0.028 [-0.053,-0.001] better
+Qwen3.5-2B-letter    sentiment           0.172   0.213   0.208 +0.030 [+0.002,+0.059] WORSE 
+Qwen3.5-2B-letter    topic               0.155   0.212   0.200 +0.047 [+0.012,+0.083] WORSE 
+
+Qwen3.5-2B-name      language            0.121   0.225   0.097 +0.103 [+0.030,+0.172] WORSE 
+Qwen3.5-2B-name      nli                 0.179   0.152   0.171 -0.027 [-0.043,-0.008] better
+Qwen3.5-2B-name      ordinal             0.144   0.077   0.076 -0.067 [-0.083,-0.042] better
+Qwen3.5-2B-name      safety              0.256   0.187   0.136 -0.066 [-0.076,-0.057] better
+Qwen3.5-2B-name      sentiment           0.208   0.122   0.120 -0.076 [-0.092,-0.058] better
+Qwen3.5-2B-name      topic               0.136   0.183   0.108 +0.040 [+0.006,+0.072] WORSE 
+
+Qwen3.5-4B-letter    language            0.142   0.078   0.113 -0.058 [-0.120,+0.011] n.s.  
+Qwen3.5-4B-letter    nli                 0.117   0.145   0.163 +0.025 [+0.011,+0.036] WORSE 
+Qwen3.5-4B-letter    ordinal             0.130   0.076   0.074 -0.048 [-0.079,-0.016] better
+Qwen3.5-4B-letter    safety              0.158   0.135   0.115 -0.027 [-0.040,-0.015] better
+Qwen3.5-4B-letter    sentiment           0.162   0.110   0.115 -0.043 [-0.058,-0.026] better
+Qwen3.5-4B-letter    topic               0.084   0.193   0.152 +0.098 [+0.071,+0.125] WORSE 
+
+Qwen3.5-4B-name      language            0.037   0.220   0.188 +0.179 [+0.142,+0.208] WORSE 
+Qwen3.5-4B-name      nli                 0.070   0.092   0.132 +0.024 [+0.004,+0.044] WORSE 
+Qwen3.5-4B-name      ordinal             0.179   0.086   0.087 -0.084 [-0.117,-0.047] better
+Qwen3.5-4B-name      safety              0.128   0.059   0.038 -0.060 [-0.077,-0.042] better
+Qwen3.5-4B-name      sentiment           0.208   0.118   0.118 -0.082 [-0.094,-0.067] better
+Qwen3.5-4B-name      topic               0.127   0.093   0.100 -0.025 [-0.051,-0.001] better
+
+embed-head           language            0.589   0.453   0.204 -0.136 [-0.150,-0.123] better
+embed-head           nli                 0.051   0.106   0.054 +0.056 [+0.028,+0.084] WORSE 
+embed-head           ordinal             0.102   0.114   0.092 +0.020 [-0.019,+0.062] n.s.  
+embed-head           safety              0.082   0.067   0.102 -0.011 [-0.032,+0.009] n.s.  
+embed-head           sentiment           0.107   0.114   0.090 +0.004 [-0.030,+0.039] n.s.  
+embed-head           topic               0.391   0.215   0.074 -0.172 [-0.179,-0.164] better
+
+smart-letter         language            0.050   0.117   0.066 +0.064 [+0.027,+0.098] WORSE 
+smart-letter         nli                 0.080   0.121   0.142 +0.039 [+0.028,+0.048] WORSE 
+smart-letter         ordinal             0.185   0.104   0.107 -0.072 [-0.091,-0.053] better
+smart-letter         safety              0.133   0.118   0.123 -0.015 [-0.027,-0.004] better
+smart-letter         sentiment           0.139   0.078   0.085 -0.051 [-0.066,-0.034] better
+smart-letter         topic               0.100   0.075   0.069 -0.017 [-0.036,+0.002] n.s.  
+
+smart-name           language            0.015   0.066   0.039 +0.052 [+0.045,+0.058] WORSE 
+smart-name           nli                 0.072   0.091   0.111 +0.020 [+0.005,+0.034] WORSE 
+smart-name           ordinal             0.227   0.152   0.149 -0.069 [-0.083,-0.051] better
+smart-name           safety              0.125   0.109   0.112 -0.013 [-0.025,-0.000] better
+smart-name           sentiment           0.135   0.049   0.059 -0.073 [-0.089,-0.054] better
+smart-name           topic               0.101   0.085   0.115 -0.009 [-0.031,+0.014] n.s.  
+
+cells=48  T-lofo: better 26, WORSE 14, n.s. 8
+
+== 4. SCALE BUDGET per family (oracle isotonic on test = the ceiling) ==
+
+arm                  family             Brier  oracle  budget % of Brier
+------------------------------------------------------------------------
+smart-name           language           0.007   0.005   0.003        36%
+smart-name           nli                0.104   0.091   0.013        13%
+smart-name           ordinal            0.264   0.201   0.063        24%
+smart-name           safety             0.159   0.129   0.030        19%
+smart-name           sentiment          0.181   0.148   0.033        18%
+smart-name           topic              0.126   0.105   0.021        17%
+
+Qwen3.5-4B-name      language           0.041   0.035   0.006        14%
+Qwen3.5-4B-name      nli                0.137   0.123   0.015        11%
+Qwen3.5-4B-name      ordinal            0.262   0.217   0.046        17%
+Qwen3.5-4B-name      safety             0.190   0.165   0.025        13%
+Qwen3.5-4B-name      sentiment          0.232   0.169   0.063        27%
+Qwen3.5-4B-name      topic              0.162   0.131   0.032        19%
+
+Qwen3.5-0.8B-name    language           0.261   0.199   0.063        24%
+Qwen3.5-0.8B-name    nli                0.220   0.195   0.026        12%
+Qwen3.5-0.8B-name    ordinal            0.230   0.134   0.097        42%
+Qwen3.5-0.8B-name    safety             0.522   0.151   0.371        71%
+Qwen3.5-0.8B-name    sentiment          0.381   0.169   0.211        56%
+Qwen3.5-0.8B-name    topic              0.219   0.157   0.062        28%
+
+== 5. VERIFIER vs SELF-CONFIDENCE across all 22 tasks ==
+Ranking Qwen3.5-4B-name's answers by P_verifier(the option it chose), vs its own confidence.
+
+verifier             family           self AURC  verifier                delta
+------------------------------------------------------------------------------
+embed-head           language            0.0107    0.0075 -0.0031 [-0.0120,+0.0047] n.s.
+embed-head           nli                 0.1005    0.1331 +0.0324 [+0.0126,+0.0516] WORSE
+embed-head           ordinal             0.3450    0.3366 -0.0090 [-0.0466,+0.0266] n.s.
+embed-head           safety              0.1531    0.0967 -0.0565 [-0.0750,-0.0395] better
+embed-head           sentiment           0.2078    0.1609 -0.0468 [-0.0676,-0.0253] better
+embed-head           topic               0.1198    0.0743 -0.0454 [-0.0592,-0.0311] better
+
+Qwen3.5-2B-name      language            0.0107    0.0260 +0.0152 [+0.0031,+0.0311] WORSE
+Qwen3.5-2B-name      nli                 0.1005    0.1524 +0.0522 [+0.0348,+0.0696] WORSE
+Qwen3.5-2B-name      ordinal             0.3450    0.4542 +0.1095 [+0.0729,+0.1477] WORSE
+Qwen3.5-2B-name      safety              0.1531    0.2275 +0.0738 [+0.0536,+0.0953] WORSE
+Qwen3.5-2B-name      sentiment           0.2078    0.2441 +0.0361 [+0.0167,+0.0552] WORSE
+Qwen3.5-2B-name      topic               0.1198    0.1788 +0.0594 [+0.0424,+0.0767] WORSE
+
+smart-name           language            0.0107    0.0012 -0.0095 [-0.0187,-0.0030] better
+smart-name           nli                 0.1005    0.0594 -0.0416 [-0.0559,-0.0273] better
+smart-name           ordinal             0.3450    0.2959 -0.0490 [-0.0741,-0.0243] better
+smart-name           safety              0.1531    0.1139 -0.0390 [-0.0547,-0.0239] better
+smart-name           sentiment           0.2078    0.1660 -0.0419 [-0.0577,-0.0257] better
+smart-name           topic               0.1198    0.0883 -0.0319 [-0.0436,-0.0217] better
+

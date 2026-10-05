@@ -31,13 +31,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from transformers import AutoTokenizer
 
+# prompting is shared with the trainer and evals: never re-implement it here
+from s1prompt import MAX_CHOICE, MAX_SCORE, compile_question, render, text
+
 TOKENIZER = "/mnt/models/quantized/ukisai-Swift-Qwen3.8-27B-NVFP4"
-LETTERS = "ABCDEFGHIJKLMNOPQRST"
-MAX_CHOICE, MAX_SCORE = 20, 10
 FLOOR = 1e-6  # probability given to a valid label that fell outside the returned top-20
 
-SYSTEM = ("You are a decision engine. You read the state, then answer the question about it by "
-          "choosing exactly one of the labelled options. Reply with the option's label only.")
 
 # ── wire schema (TypeSafe /v1/systemone) ──────────────────────────────────────────────────────
 JSONContent = str | dict[str, Any] | list[Any]
@@ -85,35 +84,6 @@ class SystemOneRequest(_Strict):
     questions: dict[str, Question] = Field(..., min_length=1)
 
 
-# ── prompting ────────────────────────────────────────────────────────────────────────────────
-def text(x: JSONContent | None) -> str:
-    if x is None:
-        return ""
-    return x if isinstance(x, str) else json.dumps(x, ensure_ascii=False, indent=1)
-
-
-def compile_question(q) -> tuple[str, list[str], list[str]]:
-    """-> (question block, label tokens, outcome names)."""
-    if q.type == "noul":
-        c = q.criteria or NoulCriteria()
-        outcomes = ["yes", "no"]
-        descs = [text(c.true), text(c.false)]
-        labels = ["A", "B"]
-    elif q.type == "choice":
-        outcomes = list(q.criteria)
-        descs = [text(v) for v in q.criteria.values()]
-        labels = list(LETTERS[: len(outcomes)])
-    else:
-        outcomes = [str(i) for i in range(len(q.criteria))]
-        descs = [text(v) for v in q.criteria]
-        labels = outcomes
-    opts = "\n".join(f"{l}) {o}" + (f": {d}" if d and q.type != "score" else (f" {d}" if d else ""))
-                     for l, o, d in zip(labels, outcomes, descs))
-    kind = {"noul": "Yes or no.", "choice": "Choose one.", "score": "Choose one level."}[q.type]
-    block = f"<question>\n{text(q.instructions)}\n{kind}\n</question>\n\nOptions:\n{opts}\n\nLabel:"
-    return block, labels, outcomes
-
-
 class Engine:
     def __init__(self, backends: list[str], model: str, temps: dict[str, float]):
         self.tok = AutoTokenizer.from_pretrained(TOKENIZER)
@@ -123,13 +93,10 @@ class Engine:
         self.http = httpx.AsyncClient(timeout=600)
 
     def render(self, state: str, block: str) -> str:
-        msgs = [{"role": "system", "content": SYSTEM},
-                {"role": "user", "content": f"<state>\n{state}\n</state>\n\n{block}"}]
-        return self.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
-                                            enable_thinking=False)
+        return render(self.tok, state, block)
 
     async def one(self, base: str, state: str, q) -> dict:
-        block, labels, outcomes = compile_question(q)
+        block, labels, outcomes = compile_question(q.model_dump())
         r = await self.http.post(f"{base}/completions", json={
             "model": self.model, "prompt": self.render(state, block),
             "max_tokens": 1, "temperature": 0.0, "logprobs": 20})
